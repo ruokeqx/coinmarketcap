@@ -8,12 +8,15 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"time"
+
+	"github.com/bitly/go-simplejson"
 )
 
 var market_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/market-pairs/latest?slug=%s&start=1&limit=100&category=spot&sort=cmc_rank_advanced"
 var historical_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/historical?id=%d&convertId=2787&timeStart=1626393600&timeEnd=1631750400"
 
-type Coin struct {
+type CoinQuote struct {
+	id         int
 	name       string
 	symbol     string
 	timeOpen   string
@@ -26,6 +29,7 @@ type Coin struct {
 	closePrice float64
 	volume     float64
 	marketCap  float64
+	timestamp  string
 }
 
 type HistoryData struct {
@@ -97,25 +101,34 @@ func GetId(body []byte) int {
 }
 
 func ParserHistoryData(body []byte) {
-	// jsonObj, _ := objx.FromJSON(string(body))
-	// quotes := jsonObj.Get("data.quotes").Data()
-	// l := reflect.ValueOf(quotes)
-	// for i := 0; i < l.Len(); i++ {
-	// 	println(l[i])
-	// }
 
-	// result := make(map[string]interface{})
-	// json.Unmarshal(body, &result)
-	// quotes := result["data"].(map[string]interface{})["quotes"]
-	// fmt.Printf("%T", quotes)
-	// println
-
-	var m HistoryData
-	if err := json.Unmarshal([]byte(body), &m); err != nil {
-		panic(err)
+	js, err := simplejson.NewJson(body)
+	if err != nil || js == nil {
+		log.Fatal("something wrong when call NewFromReader")
 	}
+	// fmt.Println(js)
+	quotes_js := js.Get("data").Get("quotes").MustArray()
+	for i, _ := range quotes_js {
 
-	println(m.data.name)
+		quote_js := js.Get("data").Get("quotes").GetIndex(i)
+
+		var quote CoinQuote
+		quote.id = js.Get("data").Get("id").MustInt()
+		quote.name = js.Get("data").Get("name").MustString()
+		quote.symbol = js.Get("data").Get("symbol").MustString()
+		quote.timeOpen = quote_js.Get("timeOpen").MustString()
+		quote.timeClose = quote_js.Get("timeClose").MustString()
+		quote.timeHigh = quote_js.Get("timeHigh").MustString()
+		quote.timeLow = quote_js.Get("timeLow").MustString()
+		quote.openPrice = quote_js.Get("quote").Get("open").MustFloat64()
+		quote.highPrice = quote_js.Get("quote").Get("high").MustFloat64()
+		quote.lowPrice = quote_js.Get("quote").Get("low").MustFloat64()
+		quote.closePrice = quote_js.Get("quote").Get("close").MustFloat64()
+		quote.volume = quote_js.Get("quote").Get("volume").MustFloat64()
+		quote.marketCap = quote_js.Get("quote").Get("marketCap").MustFloat64()
+		quote.timestamp = quote_js.Get("quote").Get("timestamp").MustString()
+		fmt.Printf("%v\n", quote)
+	}
 }
 
 func main() {
