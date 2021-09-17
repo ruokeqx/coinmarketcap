@@ -1,12 +1,18 @@
 package main
 
 import (
+	"bufio"
+	"container/list"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/cookiejar"
+	"os"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/bitly/go-simplejson"
@@ -64,7 +70,7 @@ type HistoryData struct {
 
 var jar, err = cookiejar.New(nil) // 设置全局cookie管理器
 func download(url string) []byte {
-	println(url)
+	fmt.Println(url)
 	client := &http.Client{
 		Jar:     jar,              // Jar 域自动管理Cookie
 		Timeout: 15 * time.Second, // 设置15秒超时
@@ -91,6 +97,12 @@ func download(url string) []byte {
 }
 
 func GetId(body []byte) int {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("获取ID时捕获到的错误：%s\n", r)
+		}
+	}()
+
 	// 手动解析json
 	result := make(map[string]interface{})
 	json.Unmarshal(body, &result)
@@ -132,8 +144,46 @@ func ParserHistoryData(body []byte) {
 }
 
 func main() {
-	url := fmt.Sprintf(market_url, "Bitcoin")
-	id := GetId(download(url))
-	url = fmt.Sprintf(historical_url, id)
-	ParserHistoryData(download(url))
+
+	var coins = list.New()
+	file, err := os.Open("./coins.txt") // Open用于读取文件  默认具有Read的文件描述符
+	if err != nil {
+		fmt.Println("File Open Error:%v\n", err)
+		return
+	}
+	defer file.Close() //滞后关闭
+	reader := bufio.NewReader(file)
+	for {
+		coin_name, err := reader.ReadString('\n') // 读到一个换行就结束
+		if err == io.EOF {
+			break
+		}
+		coin_name = strings.Trim(coin_name, "\r\n") // 去除前后换行符,这里巨坑
+		// coin_name = strings.Replace(coin_name, "\n", "", 1)
+		// fmt.Println(coin_name)
+		coins.PushBack(coin_name)
+	}
+	fmt.Println("File Read Success")
+
+	i := 0
+	for coin := coins.Front(); coin != nil; coin = coin.Next() {
+		if i == 10 {
+			break
+		}
+		i++
+
+		go func(coin_name string) {
+			url := fmt.Sprintf(market_url, coin_name)
+			id := GetId(download(url))
+			if id == 0 {
+				return
+			}
+
+			url = fmt.Sprintf(historical_url, id)
+			ParserHistoryData(download(url))
+		}(coin.Value.(string))
+	}
+	runtime.Gosched() // 使当前goroutine让出执行时机
+	time.Sleep(time.Hour)
+
 }
