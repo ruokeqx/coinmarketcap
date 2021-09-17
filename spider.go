@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"container/list"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,7 +14,10 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
+
+	"golang.org/x/sync/semaphore"
 
 	"github.com/bitly/go-simplejson"
 )
@@ -36,36 +40,6 @@ type CoinQuote struct {
 	volume     float64
 	marketCap  float64
 	timestamp  string
-}
-
-type HistoryData struct {
-	data struct {
-		id     int
-		name   string
-		symbol string
-		quotes []struct {
-			timeOpen  string
-			timeClose string
-			timeHigh  string
-			timeLow   string
-			quote     struct {
-				open      float64
-				high      float64
-				low       float64
-				close     float64
-				volume    float64
-				marketCap float64
-				timestamp float64
-			}
-		}
-	}
-	status struct {
-		timestamp     string
-		error_code    string
-		error_message string
-		elapsed       string
-		credit_count  int
-	}
 }
 
 var jar, err = cookiejar.New(nil) // 设置全局cookie管理器
@@ -165,14 +139,12 @@ func main() {
 	}
 	fmt.Println("File Read Success")
 
-	i := 0
+	s := semaphore.NewWeighted(1) // 并发限制为3
+	var w sync.WaitGroup
 	for coin := coins.Front(); coin != nil; coin = coin.Next() {
-		if i == 10 {
-			break
-		}
-		i++
-
+		w.Add(1)
 		go func(coin_name string) {
+			s.Acquire(context.Background(), 1)
 			url := fmt.Sprintf(market_url, coin_name)
 			id := GetId(download(url))
 			if id == 0 {
@@ -181,9 +153,11 @@ func main() {
 
 			url = fmt.Sprintf(historical_url, id)
 			ParserHistoryData(download(url))
+
+			s.Release(1)
+			w.Done()
 		}(coin.Value.(string))
 	}
 	runtime.Gosched() // 使当前goroutine让出执行时机
 	time.Sleep(time.Hour)
-
 }
