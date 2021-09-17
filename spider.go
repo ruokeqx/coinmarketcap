@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"os"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -23,9 +22,17 @@ import (
 )
 
 var market_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/market-pairs/latest?slug=%s&start=1&limit=100&category=spot&sort=cmc_rank_advanced"
+var chart_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/detail/chart?id=%d&range=1D&convertId=2787"
 var historical_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/historical?id=%d&convertId=2787&timeStart=1626393600&timeEnd=1631750400"
 
-type CoinQuote struct {
+type CoinPointQuote struct {
+	name   string
+	time   string
+	price  float64
+	volume float64
+}
+
+type CoinHistoricalQuote struct {
 	id         int
 	name       string
 	symbol     string
@@ -42,14 +49,14 @@ type CoinQuote struct {
 	timestamp  string
 }
 
-var jar, err = cookiejar.New(nil) // 设置全局cookie管理器
-func download(url string) []byte {
+var jar, _ = cookiejar.New(nil) // 设置全局cookie管理器
+func Download(url string) []byte {
 	fmt.Println(url)
 	client := &http.Client{
 		Jar:     jar,              // Jar 域自动管理Cookie
 		Timeout: 15 * time.Second, // 设置15秒超时
 	}
-	req, err := http.NewRequest("GET", url, nil)
+	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.108 Safari/537.36")
 
 	res, err := client.Do(req)
@@ -86,6 +93,24 @@ func GetId(body []byte) int {
 
 }
 
+func ParserChartData(coin_name string, body []byte) {
+	js, err := simplejson.NewJson(body)
+	if err != nil || js == nil {
+		log.Fatal("something wrong when call NewFromReader")
+	}
+	// fmt.Println(js)
+
+	points_js := js.Get("data").Get("points").MustMap()
+	for t, _ := range points_js {
+		var point CoinPointQuote
+		point.name = coin_name
+		point.time = t
+		point.price = js.Get("data").Get("points").Get(t).Get("c").GetIndex(0).MustFloat64()
+		point.volume = js.Get("data").Get("points").Get(t).Get("c").GetIndex(1).MustFloat64()
+		fmt.Printf("%v\n", point)
+	}
+}
+
 func ParserHistoryData(body []byte) {
 
 	js, err := simplejson.NewJson(body)
@@ -95,10 +120,9 @@ func ParserHistoryData(body []byte) {
 	// fmt.Println(js)
 	quotes_js := js.Get("data").Get("quotes").MustArray()
 	for i, _ := range quotes_js {
+		var quote CoinHistoricalQuote
 
 		quote_js := js.Get("data").Get("quotes").GetIndex(i)
-
-		var quote CoinQuote
 		quote.id = js.Get("data").Get("id").MustInt()
 		quote.name = js.Get("data").Get("name").MustString()
 		quote.symbol = js.Get("data").Get("symbol").MustString()
@@ -118,7 +142,7 @@ func ParserHistoryData(body []byte) {
 }
 
 func main() {
-
+	// 从coins.txt中读取coin名称并保存到列表
 	var coins = list.New()
 	file, err := os.Open("./coins.txt") // Open用于读取文件  默认具有Read的文件描述符
 	if err != nil {
@@ -139,25 +163,34 @@ func main() {
 	}
 	fmt.Println("File Read Success")
 
+	// 遍历列表  并发获取id和数据
 	s := semaphore.NewWeighted(1) // 并发限制为3
-	var w sync.WaitGroup
+	var w sync.WaitGroup          // 等待组
 	for coin := coins.Front(); coin != nil; coin = coin.Next() {
-		w.Add(1)
+		w.Add(1) // 每启动一个新任务  等待组加一
 		go func(coin_name string) {
+			// 获取id
 			s.Acquire(context.Background(), 1)
 			url := fmt.Sprintf(market_url, coin_name)
-			id := GetId(download(url))
+			id := GetId(Download(url))
 			if id == 0 {
+				s.Release(1)
+				w.Done()
 				return
 			}
 
-			url = fmt.Sprintf(historical_url, id)
-			ParserHistoryData(download(url))
+			// 获取图表数据
+			url = fmt.Sprintf(chart_url, id)
+			ParserChartData(coin_name, Download((url)))
+			// os.Exit(0)
 
-			s.Release(1)
-			w.Done()
+			// 获取历史数据
+			url = fmt.Sprintf(historical_url, id)
+			ParserHistoryData(Download(url))
+
+			s.Release(1) // 释放信号量锁
+			w.Done()     // 设置等待组完成一项任务
 		}(coin.Value.(string))
 	}
-	runtime.Gosched() // 使当前goroutine让出执行时机
-	time.Sleep(time.Hour)
+	w.Wait() // 等待所有任务的完成  即计数器值为0
 }
