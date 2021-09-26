@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -44,8 +45,8 @@ type CoinHistoricalQuote struct {
 	highPrice  float64
 	lowPrice   float64
 	closePrice float64
-	volume     float64
-	marketCap  float64
+	volume     string
+	marketCap  string
 	timestamp  string
 }
 
@@ -121,22 +122,28 @@ func ParserHistoryData(body []byte) {
 	quotes_js := js.Get("data").Get("quotes").MustArray()
 	for i, _ := range quotes_js {
 		var quote CoinHistoricalQuote
+		reg_timeOpen := regexp.MustCompile("[0-9]*-[0-9]*-[0-9]*")
+		reg_timeHL := regexp.MustCompile("[^.]*")
+		if reg_timeOpen == nil || reg_timeHL == nil {
+			fmt.Println("regexp Error!")
+			return
+		}
 
 		quote_js := js.Get("data").Get("quotes").GetIndex(i)
 		quote.id = js.Get("data").Get("id").MustInt()
 		quote.name = js.Get("data").Get("name").MustString()
 		quote.symbol = js.Get("data").Get("symbol").MustString()
-		quote.timeOpen = quote_js.Get("timeOpen").MustString()
-		quote.timeClose = quote_js.Get("timeClose").MustString()
-		quote.timeHigh = quote_js.Get("timeHigh").MustString()
-		quote.timeLow = quote_js.Get("timeLow").MustString()
+		quote.timeOpen = reg_timeOpen.FindStringSubmatch(quote_js.Get("timeOpen").MustString())[0]
+		// quote.timeClose = quote_js.Get("timeClose").MustString()
+		quote.timeHigh = strings.Replace(reg_timeHL.FindStringSubmatch(quote_js.Get("timeHigh").MustString())[0], "T", " ", 1)
+		quote.timeLow = strings.Replace(reg_timeHL.FindStringSubmatch(quote_js.Get("timeLow").MustString())[0], "T", " ", 1)
 		quote.openPrice = quote_js.Get("quote").Get("open").MustFloat64()
 		quote.highPrice = quote_js.Get("quote").Get("high").MustFloat64()
 		quote.lowPrice = quote_js.Get("quote").Get("low").MustFloat64()
 		quote.closePrice = quote_js.Get("quote").Get("close").MustFloat64()
-		quote.volume = quote_js.Get("quote").Get("volume").MustFloat64()
-		quote.marketCap = quote_js.Get("quote").Get("marketCap").MustFloat64()
-		quote.timestamp = quote_js.Get("quote").Get("timestamp").MustString()
+		quote.volume = quote_js.Get("quote").Get("volume").Interface().(json.Number).String()
+		quote.marketCap = quote_js.Get("quote").Get("marketCap").Interface().(json.Number).String()
+		// quote.timestamp = quote_js.Get("quote").Get("timestamp").MustString()
 		fmt.Printf("%v\n", quote)
 	}
 }
