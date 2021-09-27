@@ -24,7 +24,7 @@ import (
 
 var market_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/market-pairs/latest?slug=%s&start=1&limit=100&category=spot&sort=cmc_rank_advanced"
 var chart_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/detail/chart?id=%d&range=1D&convertId=2787"
-var historical_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/historical?id=%d&convertId=2787&timeStart=1626393600&timeEnd=1631750400"
+var historical_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/historical?id=%d&convertId=%d&timeStart=1626393600&timeEnd=1631750400"
 
 type CoinPointQuote struct {
 	name   string
@@ -34,20 +34,27 @@ type CoinPointQuote struct {
 }
 
 type CoinHistoricalQuote struct {
-	id         int
-	name       string
-	symbol     string
-	timeOpen   string
-	timeClose  string
-	timeHigh   string
-	timeLow    string
-	openPrice  float64
-	highPrice  float64
-	lowPrice   float64
-	closePrice float64
-	volume     string
-	marketCap  string
-	timestamp  string
+	id       int
+	name     string
+	symbol   string
+	timeOpen string
+	// timeClose    string
+	timeHigh     string
+	timeLow      string
+	openPrice    float64
+	highPrice    float64
+	lowPrice     float64
+	closePrice   float64
+	volume       string
+	marketCap    string
+	zhOpenPrice  float64
+	zhHighPrice  float64
+	zhLowPrice   float64
+	zhClosePrice float64
+	zhVolume     string
+	zhMarketCap  string
+
+	// timestamp string
 }
 
 var jar, _ = cookiejar.New(nil) // 设置全局cookie管理器
@@ -112,14 +119,20 @@ func ParserChartData(coin_name string, body []byte) {
 	}
 }
 
-func ParserHistoryData(body []byte) {
+func GetHistoryData(url string, id int) {
+	usd_url := fmt.Sprintf(url, id, 2781)
+	cny_url := fmt.Sprintf(url, id, 2787)
 
-	js, err := simplejson.NewJson(body)
-	if err != nil || js == nil {
+	usd_body := Download(usd_url)
+	cny_body := Download(cny_url)
+
+	usd_js, usd_err := simplejson.NewJson(usd_body)
+	cny_js, cny_err := simplejson.NewJson(cny_body)
+	if usd_err != nil || usd_js == nil || cny_err != nil || cny_js == nil {
 		log.Fatal("something wrong when call NewFromReader")
 	}
 	// fmt.Println(js)
-	quotes_js := js.Get("data").Get("quotes").MustArray()
+	quotes_js := usd_js.Get("data").Get("quotes").MustArray()
 	for i, _ := range quotes_js {
 		var quote CoinHistoricalQuote
 		reg_timeOpen := regexp.MustCompile("[0-9]*-[0-9]*-[0-9]*")
@@ -129,21 +142,34 @@ func ParserHistoryData(body []byte) {
 			return
 		}
 
-		quote_js := js.Get("data").Get("quotes").GetIndex(i)
-		quote.id = js.Get("data").Get("id").MustInt()
-		quote.name = js.Get("data").Get("name").MustString()
-		quote.symbol = js.Get("data").Get("symbol").MustString()
-		quote.timeOpen = reg_timeOpen.FindStringSubmatch(quote_js.Get("timeOpen").MustString())[0]
-		// quote.timeClose = quote_js.Get("timeClose").MustString()
-		quote.timeHigh = strings.Replace(reg_timeHL.FindStringSubmatch(quote_js.Get("timeHigh").MustString())[0], "T", " ", 1)
-		quote.timeLow = strings.Replace(reg_timeHL.FindStringSubmatch(quote_js.Get("timeLow").MustString())[0], "T", " ", 1)
-		quote.openPrice = quote_js.Get("quote").Get("open").MustFloat64()
-		quote.highPrice = quote_js.Get("quote").Get("high").MustFloat64()
-		quote.lowPrice = quote_js.Get("quote").Get("low").MustFloat64()
-		quote.closePrice = quote_js.Get("quote").Get("close").MustFloat64()
-		quote.volume = quote_js.Get("quote").Get("volume").Interface().(json.Number).String()
-		quote.marketCap = quote_js.Get("quote").Get("marketCap").Interface().(json.Number).String()
-		// quote.timestamp = quote_js.Get("quote").Get("timestamp").MustString()
+		quote_usd_js := usd_js.Get("data").Get("quotes").GetIndex(i)
+		quote_cny_js := cny_js.Get("data").Get("quotes").GetIndex(i)
+		quote.id = usd_js.Get("data").Get("id").MustInt()
+		quote.name = usd_js.Get("data").Get("name").MustString()
+		quote.symbol = usd_js.Get("data").Get("symbol").MustString()
+		quote.timeOpen = reg_timeOpen.FindStringSubmatch(quote_usd_js.Get("timeOpen").MustString())[0]
+		if quote_usd_js.Get("timeOpen").MustString() != quote_cny_js.Get("timeOpen").MustString() {
+			println("Parser USD and CNY Historical Quotes Error!")
+			println(quote_usd_js.Get("timeOpen").MustString(), quote_cny_js.Get("timeOpen").MustString())
+			os.Exit(-1)
+		}
+
+		// quote.timeClose = quote_usd_js.Get("timeClose").MustString()
+		quote.timeHigh = strings.Replace(reg_timeHL.FindStringSubmatch(quote_usd_js.Get("timeHigh").MustString())[0], "T", " ", 1)
+		quote.timeLow = strings.Replace(reg_timeHL.FindStringSubmatch(quote_usd_js.Get("timeLow").MustString())[0], "T", " ", 1)
+		quote.openPrice = quote_usd_js.Get("quote").Get("open").MustFloat64()
+		quote.zhOpenPrice = quote_cny_js.Get("quote").Get("open").MustFloat64()
+		quote.highPrice = quote_usd_js.Get("quote").Get("high").MustFloat64()
+		quote.zhHighPrice = quote_cny_js.Get("quote").Get("high").MustFloat64()
+		quote.lowPrice = quote_usd_js.Get("quote").Get("low").MustFloat64()
+		quote.zhLowPrice = quote_cny_js.Get("quote").Get("low").MustFloat64()
+		quote.closePrice = quote_usd_js.Get("quote").Get("close").MustFloat64()
+		quote.zhClosePrice = quote_cny_js.Get("quote").Get("close").MustFloat64()
+		quote.volume = quote_usd_js.Get("quote").Get("volume").Interface().(json.Number).String()
+		quote.zhVolume = quote_cny_js.Get("quote").Get("volume").Interface().(json.Number).String()
+		quote.marketCap = quote_usd_js.Get("quote").Get("marketCap").Interface().(json.Number).String()
+		quote.zhMarketCap = quote_cny_js.Get("quote").Get("marketCap").Interface().(json.Number).String()
+		// quote.timestamp = quote_usd_js.Get("quote").Get("timestamp").MustString()
 		fmt.Printf("%v\n", quote)
 	}
 }
@@ -192,8 +218,7 @@ func main() {
 			// os.Exit(0)
 
 			// 获取历史数据
-			url = fmt.Sprintf(historical_url, id)
-			ParserHistoryData(Download(url))
+			GetHistoryData(historical_url, id)
 
 			s.Release(1) // 释放信号量锁
 			w.Done()     // 设置等待组完成一项任务
