@@ -21,18 +21,11 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/bitly/go-simplejson"
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/mysql"
 )
 
 var market_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/market-pairs/latest?slug=%s&start=1&limit=100&category=spot&sort=cmc_rank_advanced"
 var chart_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/detail/chart?id=%d&range=1D"
 var historical_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/historical?id=%d&convertId=%d&timeStart=1626393600&timeEnd=1631750400"
-
-type Coin struct {
-	Name string
-	Id   int
-}
 
 type CoinPointQuote struct {
 	name        string
@@ -115,20 +108,6 @@ func GetId(body []byte) int {
 	// fmt.Printf("%v", id)
 	return int(id.(float64)) // 对interface{float64}转化为int
 
-}
-
-// 存入coin_name及其对应的id
-func InsertCoin(db *gorm.DB, coin_name string, id int) {
-	db.AutoMigrate(&Coin{})
-	tc := Coin{Name: coin_name, Id: id}
-	cc := Coin{}
-	db.Where("name = ?", tc.Name).First(&cc)
-	if cc.Name == "" {
-		db.Create(tc)
-		fmt.Println(tc, "insert success!")
-	} else {
-		fmt.Println(tc, "already exists!")
-	}
 }
 
 func ParserChartData(coin_name string, chart_url string, id int) {
@@ -218,11 +197,7 @@ func GetHistoryData(url string, id int) {
 
 func main() {
 	// 创建数据库连接
-	db, err := gorm.Open("mysql", "ruokeqx:ruokeqx666@(121.196.208.97:3306)/ruokeqx?charset=utf8mb4&parseTime=True&loc=Local")
-	if err != nil {
-		fmt.Print("Connect database error!")
-		return
-	}
+	db, err := sqlInit()
 	defer db.Close()
 
 	// 从coins.txt中读取coin名称并保存到列表
