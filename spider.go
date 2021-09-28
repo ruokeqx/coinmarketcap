@@ -21,11 +21,18 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/bitly/go-simplejson"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/mysql"
 )
 
 var market_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/market-pairs/latest?slug=%s&start=1&limit=100&category=spot&sort=cmc_rank_advanced"
 var chart_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/detail/chart?id=%d&range=1D"
 var historical_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/historical?id=%d&convertId=%d&timeStart=1626393600&timeEnd=1631750400"
+
+type Coin struct {
+	Name string
+	Id   int
+}
 
 type CoinPointQuote struct {
 	name        string
@@ -62,10 +69,12 @@ type CoinHistoricalQuote struct {
 var jar, _ = cookiejar.New(nil) // 设置全局cookie管理器
 func Download(tourl string) []byte {
 	fmt.Println(tourl)
+	// proxy 不用的话就注释掉
 	proxy := func(_ *http.Request) (*url.URL, error) {
 		return url.Parse("http://127.0.0.1:8088")
 	}
 	transport := &http.Transport{Proxy: proxy}
+
 	client := &http.Client{
 		Transport: transport,
 		Jar:       jar,              // Jar 域自动管理Cookie
@@ -106,6 +115,20 @@ func GetId(body []byte) int {
 	// fmt.Printf("%v", id)
 	return int(id.(float64)) // 对interface{float64}转化为int
 
+}
+
+// 存入coin_name及其对应的id
+func InsertCoin(db *gorm.DB, coin_name string, id int) {
+	db.AutoMigrate(&Coin{})
+	tc := Coin{Name: coin_name, Id: id}
+	cc := Coin{}
+	db.Where("name = ?", tc.Name).First(&cc)
+	if cc.Name == "" {
+		db.Create(tc)
+		fmt.Println(tc, "insert success!")
+	} else {
+		fmt.Println(tc, "already exists!")
+	}
 }
 
 func ParserChartData(coin_name string, chart_url string, id int) {
@@ -187,6 +210,14 @@ func GetHistoryData(url string, id int) {
 }
 
 func main() {
+	// 创建数据库连接
+	db, err := gorm.Open("mysql", "ruokeqx:ruokeqx666@(121.196.208.97:3306)/ruokeqx?charset=utf8mb4&parseTime=True&loc=Local")
+	if err != nil {
+		fmt.Print("Connect database error!")
+		return
+	}
+	defer db.Close()
+
 	// 从coins.txt中读取coin名称并保存到列表
 	var coins = list.New()
 	file, err := os.Open("./coins.txt") // Open用于读取文件  默认具有Read的文件描述符
@@ -223,6 +254,9 @@ func main() {
 				w.Done()
 				return
 			}
+
+			//存储coin_name及其对应id
+			InsertCoin(db, coin_name, id)
 
 			// 获取图表数据
 			ParserChartData(coin_name, url, id)
