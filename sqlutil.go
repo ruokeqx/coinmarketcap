@@ -8,13 +8,14 @@ import (
 )
 
 type Coin struct {
-	Name string
+	Name string `gorm:"primary_key"`
 	Id   int
 }
 
 func sqlInit() (db *gorm.DB, err error) {
 	// 创建数据库连接
-	db, err = gorm.Open("mysql", "ruokeqx:ruokeqx666@(121.196.208.97:3306)/ruokeqx?charset=utf8mb4&parseTime=True&loc=Local")
+	// db, err = gorm.Open("mysql", "ruokeqx:ruokeqx666@(121.196.208.97:3306)/ruokeqx?charset=utf8mb4&parseTime=True&loc=Local")
+	db, err = gorm.Open("mysql", "root:root@(127.0.0.1:3306)/db1?charset=utf8mb4&parseTime=True&loc=Local")
 	if err != nil {
 		fmt.Print("Connect database error!")
 		return
@@ -35,4 +36,22 @@ func InsertCoin(db *gorm.DB, coin_name string, id int) {
 	} else {
 		fmt.Println(tc, "already exists!")
 	}
+}
+
+// 存入历史数据
+func InsertHistory(db *gorm.DB, quote CoinHistoricalQuote) {
+	// db.AutoMigrate(&CoinHistoricalQuote{})
+	if !db.HasTable(quote.Name) {
+		db.Table(quote.Name).CreateTable(&CoinHistoricalQuote{})
+	}
+	db.Table(quote.Name).Create(quote)
+	// tc := Coin{Name: coin_name, Id: id}
+	// cc := Coin{}
+	// db.Table(coin_name).Where("name = ?", tc.Name).First(&cc)
+	// if cc.Name == "" {
+	// 	db.Table(coin_name).Create(tc)
+	// 	fmt.Println(tc, "insert success!")
+	// } else {
+	// 	fmt.Println(tc, "already exists!")
+	// }
 }

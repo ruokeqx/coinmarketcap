@@ -18,9 +18,9 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sync/semaphore"
-
 	"github.com/bitly/go-simplejson"
+	"github.com/jinzhu/gorm"
+	"golang.org/x/sync/semaphore"
 )
 
 var market_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/market-pairs/latest?slug=%s&start=1&limit=100&category=spot&sort=cmc_rank_advanced"
@@ -36,25 +36,25 @@ type CoinPointQuote struct {
 }
 
 type CoinHistoricalQuote struct {
-	id       int
-	name     string
-	symbol   string
-	timeOpen string
+	Id       int
+	Name     string
+	Symbol   string
+	TimeOpen string `gorm:"primary_key"`
 	// timeClose    string
-	timeHigh     string
-	timeLow      string
-	openPrice    float64
-	highPrice    float64
-	lowPrice     float64
-	closePrice   float64
-	volume       string
-	marketCap    string
-	zhOpenPrice  float64
-	zhHighPrice  float64
-	zhLowPrice   float64
-	zhClosePrice float64
-	zhVolume     string
-	zhMarketCap  string
+	TimeHigh     string
+	TimeLow      string
+	OpenPrice    float64
+	HighPrice    float64
+	LowPrice     float64
+	ClosePrice   float64
+	Volume       string
+	MarketCap    string
+	ZhOpenPrice  float64
+	ZhHighPrice  float64
+	ZhLowPrice   float64
+	ZhClosePrice float64
+	ZhVolume     string
+	ZhMarketCap  string
 
 	// timestamp string
 }
@@ -140,7 +140,7 @@ func ParserChartData(coin_name string, chart_url string, id int) {
 	}
 }
 
-func GetHistoryData(url string, id int) {
+func GetHistoryData(db *gorm.DB, url string, id int) {
 	usd_url := fmt.Sprintf(url, id, 2781)
 	cny_url := fmt.Sprintf(url, id, 2787)
 
@@ -165,10 +165,10 @@ func GetHistoryData(url string, id int) {
 
 		quote_usd_js := usd_js.Get("data").Get("quotes").GetIndex(i)
 		quote_cny_js := cny_js.Get("data").Get("quotes").GetIndex(i)
-		quote.id = usd_js.Get("data").Get("id").MustInt()
-		quote.name = usd_js.Get("data").Get("name").MustString()
-		quote.symbol = usd_js.Get("data").Get("symbol").MustString()
-		quote.timeOpen = reg_timeOpen.FindStringSubmatch(quote_usd_js.Get("timeOpen").MustString())[0]
+		quote.Id = usd_js.Get("data").Get("id").MustInt()
+		quote.Name = usd_js.Get("data").Get("name").MustString()
+		quote.Symbol = usd_js.Get("data").Get("symbol").MustString()
+		quote.TimeOpen = reg_timeOpen.FindStringSubmatch(quote_usd_js.Get("timeOpen").MustString())[0]
 		if quote_usd_js.Get("timeOpen").MustString() != quote_cny_js.Get("timeOpen").MustString() {
 			println("Parser USD and CNY Historical Quotes Error!")
 			println(quote_usd_js.Get("timeOpen").MustString(), quote_cny_js.Get("timeOpen").MustString())
@@ -176,22 +176,23 @@ func GetHistoryData(url string, id int) {
 		}
 
 		// quote.timeClose = quote_usd_js.Get("timeClose").MustString()
-		quote.timeHigh = strings.Replace(reg_timeHL.FindStringSubmatch(quote_usd_js.Get("timeHigh").MustString())[0], "T", " ", 1)
-		quote.timeLow = strings.Replace(reg_timeHL.FindStringSubmatch(quote_usd_js.Get("timeLow").MustString())[0], "T", " ", 1)
-		quote.openPrice = quote_usd_js.Get("quote").Get("open").MustFloat64()
-		quote.zhOpenPrice = quote_cny_js.Get("quote").Get("open").MustFloat64()
-		quote.highPrice = quote_usd_js.Get("quote").Get("high").MustFloat64()
-		quote.zhHighPrice = quote_cny_js.Get("quote").Get("high").MustFloat64()
-		quote.lowPrice = quote_usd_js.Get("quote").Get("low").MustFloat64()
-		quote.zhLowPrice = quote_cny_js.Get("quote").Get("low").MustFloat64()
-		quote.closePrice = quote_usd_js.Get("quote").Get("close").MustFloat64()
-		quote.zhClosePrice = quote_cny_js.Get("quote").Get("close").MustFloat64()
-		quote.volume = quote_usd_js.Get("quote").Get("volume").Interface().(json.Number).String()
-		quote.zhVolume = quote_cny_js.Get("quote").Get("volume").Interface().(json.Number).String()
-		quote.marketCap = quote_usd_js.Get("quote").Get("marketCap").Interface().(json.Number).String()
-		quote.zhMarketCap = quote_cny_js.Get("quote").Get("marketCap").Interface().(json.Number).String()
+		quote.TimeHigh = strings.Replace(reg_timeHL.FindStringSubmatch(quote_usd_js.Get("timeHigh").MustString())[0], "T", " ", 1)
+		quote.TimeLow = strings.Replace(reg_timeHL.FindStringSubmatch(quote_usd_js.Get("timeLow").MustString())[0], "T", " ", 1)
+		quote.OpenPrice = quote_usd_js.Get("quote").Get("open").MustFloat64()
+		quote.ZhOpenPrice = quote_cny_js.Get("quote").Get("open").MustFloat64()
+		quote.HighPrice = quote_usd_js.Get("quote").Get("high").MustFloat64()
+		quote.ZhHighPrice = quote_cny_js.Get("quote").Get("high").MustFloat64()
+		quote.LowPrice = quote_usd_js.Get("quote").Get("low").MustFloat64()
+		quote.ZhLowPrice = quote_cny_js.Get("quote").Get("low").MustFloat64()
+		quote.ClosePrice = quote_usd_js.Get("quote").Get("close").MustFloat64()
+		quote.ZhClosePrice = quote_cny_js.Get("quote").Get("close").MustFloat64()
+		quote.Volume = quote_usd_js.Get("quote").Get("volume").Interface().(json.Number).String()
+		quote.ZhVolume = quote_cny_js.Get("quote").Get("volume").Interface().(json.Number).String()
+		quote.MarketCap = quote_usd_js.Get("quote").Get("marketCap").Interface().(json.Number).String()
+		quote.ZhMarketCap = quote_cny_js.Get("quote").Get("marketCap").Interface().(json.Number).String()
 		// quote.timestamp = quote_usd_js.Get("quote").Get("timestamp").MustString()
 		fmt.Printf("%v\n", quote)
+		InsertHistory(db, quote)
 	}
 }
 
@@ -199,7 +200,6 @@ func main() {
 	// 创建数据库连接
 	db, err := sqlInit()
 	defer db.Close()
-
 	// 从coins.txt中读取coin名称并保存到列表
 	var coins = list.New()
 	file, err := os.Open("./coins.txt") // Open用于读取文件  默认具有Read的文件描述符
@@ -245,7 +245,7 @@ func main() {
 			// os.Exit(0)
 
 			// 获取历史数据
-			GetHistoryData(historical_url, id)
+			GetHistoryData(db, historical_url, id)
 
 			s.Release(1) // 释放信号量锁
 			w.Done()     // 设置等待组完成一项任务
