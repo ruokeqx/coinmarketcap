@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -59,13 +60,18 @@ type CoinHistoricalQuote struct {
 }
 
 var jar, _ = cookiejar.New(nil) // 设置全局cookie管理器
-func Download(url string) []byte {
-	fmt.Println(url)
-	client := &http.Client{
-		Jar:     jar,              // Jar 域自动管理Cookie
-		Timeout: 15 * time.Second, // 设置15秒超时
+func Download(tourl string) []byte {
+	fmt.Println(tourl)
+	proxy := func(_ *http.Request) (*url.URL, error) {
+		return url.Parse("http://127.0.0.1:8088")
 	}
-	req, _ := http.NewRequest("GET", url, nil)
+	transport := &http.Transport{Proxy: proxy}
+	client := &http.Client{
+		Transport: transport,
+		Jar:       jar,              // Jar 域自动管理Cookie
+		Timeout:   15 * time.Second, // 设置15秒超时
+	}
+	req, _ := http.NewRequest("GET", tourl, nil)
 	req.Header.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.108 Safari/537.36")
 
 	res, err := client.Do(req)
