@@ -23,14 +23,15 @@ import (
 )
 
 var market_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/market-pairs/latest?slug=%s&start=1&limit=100&category=spot&sort=cmc_rank_advanced"
-var chart_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/detail/chart?id=%d&range=1D&convertId=2787"
+var chart_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/detail/chart?id=%d&range=1D"
 var historical_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/historical?id=%d&convertId=%d&timeStart=1626393600&timeEnd=1631750400"
 
 type CoinPointQuote struct {
-	name   string
-	time   string
-	price  float64
-	volume float64
+	name        string
+	time        string
+	price       float64
+	volume      float64
+	bitcoinRate float64
 }
 
 type CoinHistoricalQuote struct {
@@ -101,20 +102,25 @@ func GetId(body []byte) int {
 
 }
 
-func ParserChartData(coin_name string, body []byte) {
-	js, err := simplejson.NewJson(body)
-	if err != nil || js == nil {
+func ParserChartData(coin_name string, chart_url string, id int) {
+	url := fmt.Sprintf(chart_url, id)
+	zh_url := url + "&convertId=2787"
+	js, err := simplejson.NewJson(Download(url))
+	zh_js, zh_err := simplejson.NewJson(Download(zh_url))
+	if err != nil || js == nil || zh_err != nil || zh_js == nil {
 		log.Fatal("something wrong when call NewFromReader")
 	}
 	// fmt.Println(js)
 
 	points_js := js.Get("data").Get("points").MustMap()
+	// points_zh_js := zh_js.Get("data").Get("points").MustMap()
 	for t, _ := range points_js {
 		var point CoinPointQuote
 		point.name = coin_name
 		point.time = t
-		point.price = js.Get("data").Get("points").Get(t).Get("c").GetIndex(0).MustFloat64()
-		point.volume = js.Get("data").Get("points").Get(t).Get("c").GetIndex(1).MustFloat64()
+		point.price = zh_js.Get("data").Get("points").Get(t).Get("c").GetIndex(0).MustFloat64()
+		point.volume = zh_js.Get("data").Get("points").Get(t).Get("c").GetIndex(1).MustFloat64()
+		point.bitcoinRate = js.Get("data").Get("points").Get(t).Get("v").GetIndex(3).MustFloat64()
 		fmt.Printf("%v\n", point)
 	}
 }
@@ -213,8 +219,7 @@ func main() {
 			}
 
 			// 获取图表数据
-			url = fmt.Sprintf(chart_url, id)
-			ParserChartData(coin_name, Download((url)))
+			ParserChartData(coin_name, url, id)
 			// os.Exit(0)
 
 			// 获取历史数据
