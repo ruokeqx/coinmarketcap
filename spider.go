@@ -38,7 +38,7 @@ type CoinPointQuote struct {
 	name        string
 	time        string
 	price       float64
-	volume      float64
+	volume      string
 	bitcoinRate float64
 }
 
@@ -132,8 +132,15 @@ func InsertCoin(db *gorm.DB, coin_name string, id int) {
 }
 
 func ParserChartData(coin_name string, chart_url string, id int) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Parser Chart Data Error：%s\n", r)
+		}
+	}()
+
 	url := fmt.Sprintf(chart_url, id)
 	zh_url := url + "&convertId=2787"
+	println(url, zh_url)
 	js, err := simplejson.NewJson(Download(url))
 	zh_js, zh_err := simplejson.NewJson(Download(zh_url))
 	if err != nil || js == nil || zh_err != nil || zh_js == nil {
@@ -148,7 +155,7 @@ func ParserChartData(coin_name string, chart_url string, id int) {
 		point.name = coin_name
 		point.time = t
 		point.price = zh_js.Get("data").Get("points").Get(t).Get("c").GetIndex(0).MustFloat64()
-		point.volume = zh_js.Get("data").Get("points").Get(t).Get("c").GetIndex(1).MustFloat64()
+		point.volume = zh_js.Get("data").Get("points").Get(t).Get("c").GetIndex(1).Interface().(json.Number).String()
 		point.bitcoinRate = js.Get("data").Get("points").Get(t).Get("v").GetIndex(3).MustFloat64()
 		fmt.Printf("%v\n", point)
 	}
@@ -259,7 +266,7 @@ func main() {
 			InsertCoin(db, coin_name, id)
 
 			// 获取图表数据
-			ParserChartData(coin_name, url, id)
+			ParserChartData(coin_name, chart_url, id)
 			// os.Exit(0)
 
 			// 获取历史数据
