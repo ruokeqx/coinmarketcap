@@ -140,7 +140,7 @@ func ParserChartData(coin_name string, chart_url string, id int) {
 	}
 }
 
-func GetHistoryData(db *gorm.DB, url string, id int) {
+func GetHistoryData(db *gorm.DB, coin_name string, url string, id int) {
 	usd_url := fmt.Sprintf(url, id, 2781)
 	cny_url := fmt.Sprintf(url, id, 2787)
 
@@ -166,7 +166,8 @@ func GetHistoryData(db *gorm.DB, url string, id int) {
 		quote_usd_js := usd_js.Get("data").Get("quotes").GetIndex(i)
 		quote_cny_js := cny_js.Get("data").Get("quotes").GetIndex(i)
 		quote.Id = usd_js.Get("data").Get("id").MustInt()
-		quote.Name = usd_js.Get("data").Get("name").MustString()
+		// quote.Name = usd_js.Get("data").Get("name").MustString()
+		quote.Name = coin_name // 接口解析出来的币名有些不一样 统一都用主页爬到的币名
 		quote.Symbol = usd_js.Get("data").Get("symbol").MustString()
 		quote.TimeOpen = reg_timeOpen.FindStringSubmatch(quote_usd_js.Get("timeOpen").MustString())[0]
 		if quote_usd_js.Get("timeOpen").MustString() != quote_cny_js.Get("timeOpen").MustString() {
@@ -191,7 +192,7 @@ func GetHistoryData(db *gorm.DB, url string, id int) {
 		quote.MarketCap = quote_usd_js.Get("quote").Get("marketCap").Interface().(json.Number).String()
 		quote.ZhMarketCap = quote_cny_js.Get("quote").Get("marketCap").Interface().(json.Number).String()
 		// quote.timestamp = quote_usd_js.Get("quote").Get("timestamp").MustString()
-		fmt.Printf("%v\n", quote)
+		// fmt.Printf("%v\n", quote)
 		InsertHistory(db, quote)
 	}
 }
@@ -245,7 +246,7 @@ func main() {
 			// os.Exit(0)
 
 			// 获取历史数据
-			GetHistoryData(db, historical_url, id)
+			GetHistoryData(db, coin_name, historical_url, id)
 
 			s.Release(1) // 释放信号量锁
 			w.Done()     // 设置等待组完成一项任务

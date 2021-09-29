@@ -41,17 +41,15 @@ func InsertCoin(db *gorm.DB, coin_name string, id int) {
 // 存入历史数据
 func InsertHistory(db *gorm.DB, quote CoinHistoricalQuote) {
 	// db.AutoMigrate(&CoinHistoricalQuote{})
-	if !db.HasTable(quote.Name) {
-		db.Table(quote.Name).CreateTable(&CoinHistoricalQuote{})
+	if !db.HasTable("history-" + quote.Name) {
+		db.Table("history-" + quote.Name).CreateTable(&CoinHistoricalQuote{})
 	}
-	db.Table(quote.Name).Create(quote)
-	// tc := Coin{Name: coin_name, Id: id}
-	// cc := Coin{}
-	// db.Table(coin_name).Where("name = ?", tc.Name).First(&cc)
-	// if cc.Name == "" {
-	// 	db.Table(coin_name).Create(tc)
-	// 	fmt.Println(tc, "insert success!")
-	// } else {
-	// 	fmt.Println(tc, "already exists!")
-	// }
+	th := CoinHistoricalQuote{}
+	db.Table("history-"+quote.Name).Where("name = ?", quote.Name).First(&th)
+	if th.Name == "" {
+		db.Table("history-" + quote.Name).Create(quote)
+		fmt.Println(quote, "insert success!")
+	} else {
+		fmt.Println(quote, "already exists!")
+	}
 }
