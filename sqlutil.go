@@ -45,8 +45,8 @@ func InsertHistory(db *gorm.DB, quote CoinHistoricalQuote) {
 		db.Table("history-" + quote.Name).CreateTable(&CoinHistoricalQuote{})
 	}
 	th := CoinHistoricalQuote{}
-	db.Table("history-"+quote.Name).Where("name = ?", quote.Name).First(&th)
-	if th.Name == "" {
+	db.Table("history-"+quote.Name).Where("time_open = ?", quote.TimeOpen).First(&th)
+	if th.TimeOpen == "" {
 		db.Table("history-" + quote.Name).Create(quote)
 		fmt.Println(quote, "insert success!")
 	} else {
