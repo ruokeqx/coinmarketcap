@@ -12,6 +12,19 @@ type Coin struct {
 	Id   int
 }
 
+type CoinPointQuote struct {
+	Id          int
+	Name        string
+	Time        string `gorm:"primary_key"`
+	Price       float64
+	Volume      string
+	MarketCap   string
+	BitcoinRate string
+	ZhPrice     float64
+	ZhVolume    string
+	ZhMarketCap string
+}
+
 type CoinHistoricalQuote struct {
 	Id       int
 	Name     string
@@ -38,8 +51,8 @@ type CoinHistoricalQuote struct {
 
 func sqlInit() (db *gorm.DB, err error) {
 	// 创建数据库连接
-	db, err = gorm.Open("mysql", "ruokeqx:ruokeqx666@(121.196.208.97:3306)/ruokeqx?charset=utf8mb4&parseTime=True&loc=Local")
-	// db, err = gorm.Open("mysql", "root:root@(127.0.0.1:3306)/db1?charset=utf8mb4&parseTime=True&loc=Local")
+	// db, err = gorm.Open("mysql", "ruokeqx:ruokeqx666@(121.196.208.97:3306)/ruokeqx?charset=utf8mb4&parseTime=True&loc=Local")
+	db, err = gorm.Open("mysql", "root:root@(127.0.0.1:3306)/db1?charset=utf8mb4&parseTime=True&loc=Local")
 	if err != nil {
 		fmt.Print("Connect database error!")
 		return
@@ -59,6 +72,22 @@ func InsertCoin(db *gorm.DB, coin_name string, id int) {
 		fmt.Println(tc, "insert success!")
 	} else {
 		fmt.Println(tc, "already exists!")
+	}
+}
+
+// 存入chart数据
+func InsertChart(db *gorm.DB, point CoinPointQuote) {
+	// db.AutoMigrate(&CoinHistoricalQuote{})
+	if !db.HasTable("chart-" + point.Name) {
+		db.Table("chart-" + point.Name).CreateTable(&CoinPointQuote{})
+	}
+	th := CoinPointQuote{}
+	db.Table("chart-"+point.Name).Where("Time = ?", point.Time).First(&th)
+	if th.Time == "" {
+		db.Table("chart-" + point.Name).Create(point)
+		fmt.Println(point, "insert success!")
+	} else {
+		fmt.Println(point, "already exists!")
 	}
 }
 

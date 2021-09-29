@@ -27,19 +27,6 @@ var market_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/marke
 var chart_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/detail/chart?id=%d&range=1D&convertId=2787"
 var historical_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/historical?id=%d&convertId=%d&timeStart=1577808000&timeEnd=%d" // 2020.01.01
 
-type CoinPointQuote struct {
-	Id          int
-	Name        string
-	Time        string
-	Price       float64
-	Volume      string
-	MarketCap   string
-	BitcoinRate string
-	ZhPrice     float64
-	ZhVolume    string
-	ZhMarketCap string
-}
-
 var jar, _ = cookiejar.New(nil) // 设置全局cookie管理器
 func Download(tourl string) []byte {
 	fmt.Println(tourl)
@@ -95,7 +82,7 @@ func GetId(body []byte) int {
 
 }
 
-func ParserChartData(coin_name string, chart_url string, id int) {
+func ParserChartData(db *gorm.DB, coin_name string, chart_url string, id int) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("Parser Chart Data Error：%s\n", r)
@@ -107,7 +94,6 @@ func ParserChartData(coin_name string, chart_url string, id int) {
 	js, err := simplejson.NewJson(Download(url))
 	if err != nil || js == nil {
 		log.Println("something wrong when call NewFromReader")
-		return
 	}
 	// fmt.Println(js)
 
@@ -125,7 +111,8 @@ func ParserChartData(coin_name string, chart_url string, id int) {
 		point.ZhVolume = js.Get("data").Get("points").Get(t).Get("c").GetIndex(1).Interface().(json.Number).String()
 		point.ZhMarketCap = js.Get("data").Get("points").Get(t).Get("c").GetIndex(2).Interface().(json.Number).String()
 		point.BitcoinRate = js.Get("data").Get("points").Get(t).Get("v").GetIndex(3).Interface().(json.Number).String()
-		fmt.Printf("%v\n", point)
+		// fmt.Printf("%v\n", point)
+		InsertChart(db, point)
 	}
 }
 
@@ -140,7 +127,6 @@ func GetHistoryData(db *gorm.DB, coin_name string, url string, id int) {
 	cny_js, cny_err := simplejson.NewJson(cny_body)
 	if usd_err != nil || usd_js == nil || cny_err != nil || cny_js == nil {
 		log.Println("something wrong when call NewFromReader")
-		return
 	}
 	// fmt.Println(js)
 	quotes_js := usd_js.Get("data").Get("quotes").MustArray()
@@ -214,7 +200,7 @@ func main() {
 	fmt.Println("File Read Success")
 
 	// 遍历列表  并发获取id和数据
-	s := semaphore.NewWeighted(5) // 并发限制为3
+	s := semaphore.NewWeighted(1) // 并发限制为3
 	var w sync.WaitGroup          // 等待组
 	for coin := coins.Front(); coin != nil; coin = coin.Next() {
 		w.Add(1) // 每启动一个新任务  等待组加一
@@ -233,7 +219,7 @@ func main() {
 			InsertCoin(db, coin_name, id)
 
 			// 获取图表数据
-			ParserChartData(coin_name, chart_url, id)
+			ParserChartData(db, coin_name, chart_url, id)
 			// os.Exit(0)
 
 			// 获取历史数据
