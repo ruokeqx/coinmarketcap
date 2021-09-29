@@ -24,15 +24,20 @@ import (
 )
 
 var market_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/market-pairs/latest?slug=%s&start=1&limit=100&category=spot&sort=cmc_rank_advanced"
-var chart_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/detail/chart?id=%d&range=1D"
-var historical_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/historical?id=%d&convertId=%d&timeStart=1626393600&timeEnd=1631750400"
+var chart_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/detail/chart?id=%d&range=1D&convertId=2787"
+var historical_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/historical?id=%d&convertId=%d&timeStart=1577808000&timeEnd=%d" // 2020.01.01
 
 type CoinPointQuote struct {
-	name        string
-	time        string
-	price       float64
-	volume      string
-	bitcoinRate float64
+	Id          int
+	Name        string
+	Time        string
+	Price       float64
+	Volume      string
+	MarketCap   string
+	BitcoinRate string
+	ZhPrice     float64
+	ZhVolume    string
+	ZhMarketCap string
 }
 
 var jar, _ = cookiejar.New(nil) // 设置全局cookie管理器
@@ -54,16 +59,16 @@ func Download(tourl string) []byte {
 
 	res, err := client.Do(req)
 	if err != nil {
-		log.Fatal("http Get failed!")
+		log.Println("http Get failed!")
 		return nil
 	}
 	defer res.Body.Close() // 注册关闭连接
 	if res.StatusCode != 200 {
-		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+		log.Println("status code error: %d %s", res.StatusCode, res.Status)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.Fatal("http read body failed!")
+		log.Println("http read body failed!")
 		return nil
 	}
 	// fmt.Println(string(body))
@@ -76,6 +81,10 @@ func GetId(body []byte) int {
 			fmt.Printf("获取ID时捕获到的错误：%s\n", r)
 		}
 	}()
+
+	if body == nil {
+		return 0
+	}
 
 	// 手动解析json
 	result := make(map[string]interface{})
@@ -94,11 +103,9 @@ func ParserChartData(coin_name string, chart_url string, id int) {
 	}()
 
 	url := fmt.Sprintf(chart_url, id)
-	zh_url := url + "&convertId=2787"
-	println(url, zh_url)
+
 	js, err := simplejson.NewJson(Download(url))
-	zh_js, zh_err := simplejson.NewJson(Download(zh_url))
-	if err != nil || js == nil || zh_err != nil || zh_js == nil {
+	if err != nil || js == nil {
 		log.Fatal("something wrong when call NewFromReader")
 	}
 	// fmt.Println(js)
@@ -107,18 +114,23 @@ func ParserChartData(coin_name string, chart_url string, id int) {
 	// points_zh_js := zh_js.Get("data").Get("points").MustMap()
 	for t, _ := range points_js {
 		var point CoinPointQuote
-		point.name = coin_name
-		point.time = t
-		point.price = zh_js.Get("data").Get("points").Get(t).Get("c").GetIndex(0).MustFloat64()
-		point.volume = zh_js.Get("data").Get("points").Get(t).Get("c").GetIndex(1).Interface().(json.Number).String()
-		point.bitcoinRate = js.Get("data").Get("points").Get(t).Get("v").GetIndex(3).MustFloat64()
+		point.Id = id
+		point.Name = coin_name
+		point.Time = t
+		point.Price = js.Get("data").Get("points").Get(t).Get("v").GetIndex(0).MustFloat64()
+		point.Volume = js.Get("data").Get("points").Get(t).Get("v").GetIndex(1).Interface().(json.Number).String()
+		point.MarketCap = js.Get("data").Get("points").Get(t).Get("v").GetIndex(2).Interface().(json.Number).String()
+		point.ZhPrice = js.Get("data").Get("points").Get(t).Get("c").GetIndex(0).MustFloat64()
+		point.ZhVolume = js.Get("data").Get("points").Get(t).Get("c").GetIndex(1).Interface().(json.Number).String()
+		point.ZhMarketCap = js.Get("data").Get("points").Get(t).Get("c").GetIndex(2).Interface().(json.Number).String()
+		point.BitcoinRate = js.Get("data").Get("points").Get(t).Get("v").GetIndex(3).Interface().(json.Number).String()
 		fmt.Printf("%v\n", point)
 	}
 }
 
 func GetHistoryData(db *gorm.DB, coin_name string, url string, id int) {
-	usd_url := fmt.Sprintf(url, id, 2781)
-	cny_url := fmt.Sprintf(url, id, 2787)
+	usd_url := fmt.Sprintf(url, id, 2781, time.Now().Unix())
+	cny_url := fmt.Sprintf(url, id, 2787, time.Now().Unix())
 
 	usd_body := Download(usd_url)
 	cny_body := Download(cny_url)
@@ -149,7 +161,8 @@ func GetHistoryData(db *gorm.DB, coin_name string, url string, id int) {
 		if quote_usd_js.Get("timeOpen").MustString() != quote_cny_js.Get("timeOpen").MustString() {
 			println("Parser USD and CNY Historical Quotes Error!")
 			println(quote_usd_js.Get("timeOpen").MustString(), quote_cny_js.Get("timeOpen").MustString())
-			os.Exit(-1)
+			// os.Exit(-1)
+			return
 		}
 
 		// quote.timeClose = quote_usd_js.Get("timeClose").MustString()
@@ -199,7 +212,7 @@ func main() {
 	fmt.Println("File Read Success")
 
 	// 遍历列表  并发获取id和数据
-	s := semaphore.NewWeighted(1) // 并发限制为3
+	s := semaphore.NewWeighted(5) // 并发限制为3
 	var w sync.WaitGroup          // 等待组
 	for coin := coins.Front(); coin != nil; coin = coin.Next() {
 		w.Add(1) // 每启动一个新任务  等待组加一
