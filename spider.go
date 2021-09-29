@@ -35,30 +35,6 @@ type CoinPointQuote struct {
 	bitcoinRate float64
 }
 
-type CoinHistoricalQuote struct {
-	Id       int
-	Name     string
-	Symbol   string
-	TimeOpen string `gorm:"primary_key"`
-	// timeClose    string
-	TimeHigh     string
-	TimeLow      string
-	OpenPrice    float64
-	HighPrice    float64
-	LowPrice     float64
-	ClosePrice   float64
-	Volume       string
-	MarketCap    string
-	ZhOpenPrice  float64
-	ZhHighPrice  float64
-	ZhLowPrice   float64
-	ZhClosePrice float64
-	ZhVolume     string
-	ZhMarketCap  string
-
-	// timestamp string
-}
-
 var jar, _ = cookiejar.New(nil) // 设置全局cookie管理器
 func Download(tourl string) []byte {
 	fmt.Println(tourl)

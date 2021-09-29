@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	socketio "github.com/googollee/go-socket.io"
@@ -28,6 +31,30 @@ func CORSMiddleware() gin.HandlerFunc {
 	}
 }
 
+func historical(c *gin.Context) {
+	db, err := sqlInit()
+	if err != nil {
+		fmt.Println("connect error")
+	}
+	defer db.Close()
+	coinName := c.Query("coinName")
+	tS := c.Query("timeStart")
+	tE := c.Query("timeEnd")
+	timeStart, err := strconv.ParseInt(tS, 10, 64)
+	timeEnd, _ := strconv.ParseInt(tE, 10, 64)
+	tS = time.Unix(int64(timeStart), 0).Format("2006-01-02")
+	tE = time.Unix(int64(timeEnd), 0).Format("2006-01-02")
+	var his []CoinHistoricalQuote
+	// var hisList []string
+	db.Table("history-"+coinName).Where("time_open BETWEEN ? AND ?", tS, tE).Find(&his)
+	b, err := json.Marshal(his)
+	if err != nil {
+		fmt.Println("query result convert to json error!")
+	} else {
+		c.Writer.Write(b)
+	}
+}
+
 func main() {
 	router := gin.Default()
 
@@ -49,7 +76,8 @@ func main() {
 	router.GET("/socket.io/*any", gin.WrapH(server))
 	router.POST("/socket.io/*any", gin.WrapH(server))
 
-	if err := router.Run(":8000"); err != nil {
+	router.GET("/data-api/v3/cryptocurrency/historical", historical)
+	if err := router.Run(":8080"); err != nil {
 		log.Fatal("failed run app: ", err)
 	}
 }
