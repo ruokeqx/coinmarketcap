@@ -94,6 +94,7 @@ func ParserChartData(db *gorm.DB, coin_name string, chart_url string, id int) {
 	js, err := simplejson.NewJson(Download(url))
 	if err != nil || js == nil {
 		log.Println("something wrong when call NewFromReader")
+		return
 	}
 	// fmt.Println(js)
 
@@ -127,6 +128,7 @@ func GetHistoryData(db *gorm.DB, coin_name string, url string, id int) {
 	cny_js, cny_err := simplejson.NewJson(cny_body)
 	if usd_err != nil || usd_js == nil || cny_err != nil || cny_js == nil {
 		log.Println("something wrong when call NewFromReader")
+		return
 	}
 	// fmt.Println(js)
 	quotes_js := usd_js.Get("data").Get("quotes").MustArray()

@@ -51,8 +51,8 @@ type CoinHistoricalQuote struct {
 
 func sqlInit() (db *gorm.DB, err error) {
 	// 创建数据库连接
-	// db, err = gorm.Open("mysql", "ruokeqx:ruokeqx666@(121.196.208.97:3306)/ruokeqx?charset=utf8mb4&parseTime=True&loc=Local")
-	db, err = gorm.Open("mysql", "root:root@(127.0.0.1:3306)/db1?charset=utf8mb4&parseTime=True&loc=Local")
+	db, err = gorm.Open("mysql", "ruokeqx:ruokeqx666@(121.196.208.97:3306)/ruokeqx?charset=utf8mb4&parseTime=True&loc=Local")
+	// db, err = gorm.Open("mysql", "root:root@(127.0.0.1:3306)/db1?charset=utf8mb4&parseTime=True&loc=Local")
 	if err != nil {
 		fmt.Print("Connect database error!")
 		return
