@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	socketio "github.com/googollee/go-socket.io"
+	"github.com/gorilla/websocket"
 )
 
 func CORSMiddleware() gin.HandlerFunc {
@@ -31,6 +31,76 @@ func CORSMiddleware() gin.HandlerFunc {
 	}
 }
 
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
+
+// latest data api function
+func latest(c *gin.Context) {
+	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": http.StatusInternalServerError,
+			"msg":  err,
+		})
+		// log.Println("upgrade:", err)
+		return
+	}
+	defer ws.Close()
+	var message []byte
+	for {
+		_, message, err = ws.ReadMessage()
+		fmt.Println(string(message))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code": http.StatusInternalServerError,
+				"msg":  err,
+			})
+			// log.Println("read:", err)
+			return
+		}
+		if message != nil && string(message[0]) == "[" {
+			break
+		}
+	}
+	// coinmarketcap websocket
+	client, _, err := websocket.DefaultDialer.Dial("wss://stream.coinmarketcap.com/price/latest", nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": http.StatusInternalServerError,
+			"msg":  err,
+		})
+		// log.Println("websocket:", err)
+		return
+	}
+	// command := "{\"method\":\"subscribe\",\"id\":\"price\",\"data\":{\"cryptoIds\":[1,52,1027,5994],\"index\":null}}"
+	command := fmt.Sprintf("{\"method\":\"subscribe\",\"id\":\"price\",\"data\":{\"cryptoIds\":%s,\"index\":null}}", message)
+	err = client.WriteMessage(websocket.TextMessage, []byte(command))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": http.StatusInternalServerError,
+			"msg":  err,
+		})
+		// log.Println("Subscription failed:", err)
+		return
+	}
+	for {
+		_, json_bytes, _ := client.ReadMessage()
+		fmt.Println(string(json_bytes))
+		err = ws.WriteMessage(websocket.TextMessage, json_bytes) // websocket.TextMessage/websocket.BinaryMessage
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code": http.StatusInternalServerError,
+				"msg":  err,
+			})
+			return
+		}
+	}
+}
+
+// data to paint chart
 func chart(c *gin.Context) {
 	// /data-api/v3/cryptocurrency/detail/chart?coinName=(?)&range=(?)&convertId=(?)
 	db, err := sqlInit()
@@ -115,6 +185,7 @@ func chart(c *gin.Context) {
 	}
 }
 
+// historical data
 func historical(c *gin.Context) {
 	db, err := sqlInit()
 	if err != nil {
@@ -162,27 +233,15 @@ func historical(c *gin.Context) {
 func main() {
 	router := gin.Default()
 
-	server := socketio.NewServer(nil)
-	server.OnConnect("/", func(s socketio.Conn) error {
-		s.Emit("reply", "hello")
-		return nil
-	})
-
-	server.OnEvent("/", "notice", func(s socketio.Conn, msg string) {
-		fmt.Print(msg)
-		s.Emit("res", "have "+msg)
-	})
-
-	go server.Serve()
-	defer server.Close()
-
+	// middleware
 	router.Use(CORSMiddleware())
-	router.GET("/socket.io/*any", gin.WrapH(server))
-	router.POST("/socket.io/*any", gin.WrapH(server))
+
+	router.GET("/price/latest", latest)
 	// /data-api/v3/cryptocurrency/detail/chart?coinName=(?)&range=(?)&convertId=(?)
 	router.GET("/data-api/v3/cryptocurrency/detail/chart", chart)
 	// /data-api/v3/cryptocurrency/historical?coinName=(?)&timeStart=(?)&timeEnd=(?)
 	router.GET("/data-api/v3/cryptocurrency/historical", historical)
+
 	if err := router.Run(":8080"); err != nil {
 		log.Fatal("failed run app: ", err)
 	}
