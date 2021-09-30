@@ -31,6 +31,90 @@ func CORSMiddleware() gin.HandlerFunc {
 	}
 }
 
+func chart(c *gin.Context) {
+	// /data-api/v3/cryptocurrency/detail/chart?coinName=(?)&range=(?)&convertId=(?)
+	db, err := sqlInit()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "Database connect error!",
+		})
+		return
+	}
+	defer db.Close()
+	coinName := c.Query("coinName")
+	if !db.HasTable("chart-" + coinName) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "No query coin!",
+		})
+		return
+	}
+	queryRange := c.Query("range")
+	convertId := c.Query("convertId")
+	fmt.Println(convertId)
+	var tE int64
+	var tS int64
+	var chart []CoinPointQuote
+	var retChart []CoinPointQuote
+	switch queryRange {
+	case "1D":
+		// fmt.Println("1D")
+		tE = time.Now().Unix()
+		tS = tE - 60*60*24
+		db.Table("chart-"+coinName).Where("time BETWEEN ? AND ?", tS, tE).Order("time").Find(&chart)
+		retChart = chart
+	case "7D":
+		// fmt.Println("7D")
+		tE = time.Now().Unix()
+		tS = tE - 60*60*24*7
+		db.Table("chart-"+coinName).Where("time BETWEEN ? AND ?", tS, tE).Order("time").Find(&chart)
+		retChart = chart
+	case "1M":
+		// fmt.Println("1M")
+		tE = time.Now().Unix()
+		tS = tE - 60*60*24*30
+		db.Table("chart-"+coinName).Where("time BETWEEN ? AND ?", tS, tE).Order("time").Find(&chart)
+		for index, cont := range chart {
+			if index%12 == 0 {
+				retChart = append(retChart, cont)
+			}
+		}
+	case "1Y":
+		// fmt.Println("1Y")
+		tE = time.Now().Unix()
+		tS = tE - 60*60*24*365
+		db.Table("chart-"+coinName).Where("time BETWEEN ? AND ?", tS, tE).Order("time").Find(&chart)
+		for index, cont := range chart {
+			if index%288 == 0 {
+				retChart = append(retChart, cont)
+			}
+		}
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "Now such option!",
+		})
+		return
+	}
+	if len(retChart) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "No data now!",
+		})
+		return
+	} else {
+		b, err := json.Marshal(retChart)
+		if err != nil {
+			fmt.Println("query result convert to json error!")
+			return
+		} else {
+			c.Writer.Write(b)
+			return
+		}
+	}
+}
+
 func historical(c *gin.Context) {
 	db, err := sqlInit()
 	if err != nil {
@@ -95,6 +179,8 @@ func main() {
 	router.Use(CORSMiddleware())
 	router.GET("/socket.io/*any", gin.WrapH(server))
 	router.POST("/socket.io/*any", gin.WrapH(server))
+	// /data-api/v3/cryptocurrency/detail/chart?coinName=(?)&range=(?)&convertId=(?)
+	router.GET("/data-api/v3/cryptocurrency/detail/chart", chart)
 	// /data-api/v3/cryptocurrency/historical?coinName=(?)&timeStart=(?)&timeEnd=(?)
 	router.GET("/data-api/v3/cryptocurrency/historical", historical)
 	if err := router.Run(":8080"); err != nil {
