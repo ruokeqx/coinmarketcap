@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -212,7 +211,7 @@ func historical(c *gin.Context) {
 	tE = time.Unix(int64(timeEnd), 0).Format("2006-01-02")
 	var his []CoinHistoricalQuote
 	// var hisList []string
-	db.Table("history-"+coinName).Where("time_open BETWEEN ? AND ?", tS, tE).Find(&his)
+	db.Table("history-"+coinName).Where("time_open BETWEEN ? AND ?", tS, tE).Order("time_open").Find(&his)
 	if len(his) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code": http.StatusBadRequest,
@@ -227,22 +226,5 @@ func historical(c *gin.Context) {
 			c.Writer.Write(b)
 			return
 		}
-	}
-}
-
-func main() {
-	router := gin.Default()
-
-	// middleware
-	router.Use(CORSMiddleware())
-
-	router.GET("/price/latest", latest)
-	// /data-api/v3/cryptocurrency/detail/chart?coinName=(?)&range=(?)&convertId=(?)
-	router.GET("/data-api/v3/cryptocurrency/detail/chart", chart)
-	// /data-api/v3/cryptocurrency/historical?coinName=(?)&timeStart=(?)&timeEnd=(?)
-	router.GET("/data-api/v3/cryptocurrency/historical", historical)
-
-	if err := router.Run(":8080"); err != nil {
-		log.Fatal("failed run app: ", err)
 	}
 }
