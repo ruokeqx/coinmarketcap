@@ -24,8 +24,8 @@ import (
 )
 
 var market_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/market-pairs/latest?slug=%s&start=1&limit=100&category=spot&sort=cmc_rank_advanced"
-var chart_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/detail/chart?id=%d&range=1D&convertId=2787"
-var historical_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/historical?id=%d&convertId=%d&timeStart=1577808000&timeEnd=%d" // 2020.01.01
+var chart_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/detail/chart?id=%d&range=&%s&convertId=2787"
+var historical_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/historical?id=%d&convertId=%d&timeStart=%d&timeEnd=%d" // 2020.01.01
 
 var jar, _ = cookiejar.New(nil) // 设置全局cookie管理器
 func Download(tourl string) []byte {
@@ -51,7 +51,7 @@ func Download(tourl string) []byte {
 	}
 	defer res.Body.Close() // 注册关闭连接
 	if res.StatusCode != 200 {
-		log.Println("status code error: %d %s", res.StatusCode, res.Status)
+		log.Printf("status code error: %d %s\n", res.StatusCode, res.Status)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -82,14 +82,15 @@ func GetId(body []byte) int {
 
 }
 
-func ParserChartData(db *gorm.DB, coin_name string, chart_url string, id int) {
+// 增加天数选项 后续可以定时每天爬1D
+func ParserChartData(db *gorm.DB, coin_name string, chart_url string, id int, choice string) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("Parser Chart Data Error：%s\n", r)
 		}
 	}()
 
-	url := fmt.Sprintf(chart_url, id)
+	url := fmt.Sprintf(chart_url, id, choice)
 
 	js, err := simplejson.NewJson(Download(url))
 	if err != nil || js == nil {
@@ -117,9 +118,10 @@ func ParserChartData(db *gorm.DB, coin_name string, chart_url string, id int) {
 	}
 }
 
-func GetHistoryData(db *gorm.DB, coin_name string, url string, id int) {
-	usd_url := fmt.Sprintf(url, id, 2781, time.Now().Unix())
-	cny_url := fmt.Sprintf(url, id, 2787, time.Now().Unix())
+// 增加timeStart 可以每多少时间爬指定量 不用每次从头爬
+func GetHistoryData(db *gorm.DB, coin_name string, url string, id int, timeStart int64) {
+	usd_url := fmt.Sprintf(url, id, 2781, timeStart, time.Now().Unix())
+	cny_url := fmt.Sprintf(url, id, 2787, timeStart, time.Now().Unix())
 
 	usd_body := Download(usd_url)
 	cny_body := Download(cny_url)
@@ -179,12 +181,15 @@ func GetHistoryData(db *gorm.DB, coin_name string, url string, id int) {
 func main() {
 	// 创建数据库连接
 	db, err := sqlInit()
+	if err != nil {
+		fmt.Println("database connect error!")
+	}
 	defer db.Close()
 	// 从coins.txt中读取coin名称并保存到列表
 	var coins = list.New()
 	file, err := os.Open("./coins.txt") // Open用于读取文件  默认具有Read的文件描述符
 	if err != nil {
-		fmt.Println("File Open Error:%v\n", err)
+		fmt.Printf("File Open Error:%v\n", err)
 		return
 	}
 	defer file.Close() //滞后关闭
@@ -221,11 +226,13 @@ func main() {
 			InsertCoin(db, coin_name, id)
 
 			// 获取图表数据
-			ParserChartData(db, coin_name, chart_url, id)
+			sevenday := "7D"
+			ParserChartData(db, coin_name, chart_url, id, sevenday)
 			// os.Exit(0)
 
 			// 获取历史数据
-			GetHistoryData(db, coin_name, historical_url, id)
+			day2020 := int64(1577808000)
+			GetHistoryData(db, coin_name, historical_url, id, day2020)
 
 			s.Release(1) // 释放信号量锁
 			w.Done()     // 设置等待组完成一项任务
