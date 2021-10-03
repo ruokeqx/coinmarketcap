@@ -178,7 +178,7 @@ func GetHistoryData(db *gorm.DB, coin_name string, url string, id int, timeStart
 	}
 }
 
-func spider(concurrent int64, choice string, hts int64) {
+func spider(concurrent int64, choice string, hts int64, flag bool) {
 	// 创建数据库连接
 	db, err := sqlInit()
 	if err != nil {
@@ -227,12 +227,16 @@ func spider(concurrent int64, choice string, hts int64) {
 
 			// 获取图表数据
 			// choice := "7D"
-			ParserChartData(db, coin_name, chart_url, id, choice)
+			if flag && !db.HasTable("chart-"+coin_name) {
+				ParserChartData(db, coin_name, chart_url, id, choice)
+			}
 			// os.Exit(0)
 
 			// 获取历史数据
 			// hts := int64(1577808000)
-			GetHistoryData(db, coin_name, historical_url, id, hts)
+			if flag && !db.HasTable("history-"+coin_name) {
+				GetHistoryData(db, coin_name, historical_url, id, hts)
+			}
 
 			s.Release(1) // 释放信号量锁
 			w.Done()     // 设置等待组完成一项任务
@@ -241,6 +245,6 @@ func spider(concurrent int64, choice string, hts int64) {
 	w.Wait() // 等待所有任务的完成  即计数器值为0
 }
 
-// func main() {
-// 	spider(int64(3), "7D", int64(1577808000))
-// }
+func main() {
+	spider(int64(3), "7D", int64(1577808000), true)
+}
