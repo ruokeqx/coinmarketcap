@@ -2,9 +2,21 @@ package main
 
 import (
 	"log"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
+
+func timedSpider() {
+	for {
+		now := time.Now()
+		next := now.Add(time.Hour * 24)
+		next = time.Date(next.Year(), next.Month(), next.Day(), 8, 30, 0, 0, next.Location())
+		t := time.NewTimer(next.Sub(now))
+		<-t.C
+		spider(int64(3), "1D", int64(time.Now().Unix()-86400))
+	}
+}
 
 func main() {
 	router := gin.Default()

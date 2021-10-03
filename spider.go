@@ -178,7 +178,7 @@ func GetHistoryData(db *gorm.DB, coin_name string, url string, id int, timeStart
 	}
 }
 
-func main() {
+func spider(concurrent int64, choice string, hts int64) {
 	// 创建数据库连接
 	db, err := sqlInit()
 	if err != nil {
@@ -207,8 +207,8 @@ func main() {
 	fmt.Println("File Read Success")
 
 	// 遍历列表  并发获取id和数据
-	s := semaphore.NewWeighted(1) // 并发限制为3
-	var w sync.WaitGroup          // 等待组
+	s := semaphore.NewWeighted(concurrent) // 并发限制为3
+	var w sync.WaitGroup                   // 等待组
 	for coin := coins.Front(); coin != nil; coin = coin.Next() {
 		w.Add(1) // 每启动一个新任务  等待组加一
 		go func(coin_name string) {
@@ -226,17 +226,21 @@ func main() {
 			InsertCoin(db, coin_name, id)
 
 			// 获取图表数据
-			sevenday := "7D"
-			ParserChartData(db, coin_name, chart_url, id, sevenday)
+			// choice := "7D"
+			ParserChartData(db, coin_name, chart_url, id, choice)
 			// os.Exit(0)
 
 			// 获取历史数据
-			day2020 := int64(1577808000)
-			GetHistoryData(db, coin_name, historical_url, id, day2020)
+			// hts := int64(1577808000)
+			GetHistoryData(db, coin_name, historical_url, id, hts)
 
 			s.Release(1) // 释放信号量锁
 			w.Done()     // 设置等待组完成一项任务
 		}(coin.Value.(string))
 	}
 	w.Wait() // 等待所有任务的完成  即计数器值为0
+}
+
+func main() {
+	spider(int64(3), "7D", int64(1577808000))
 }
