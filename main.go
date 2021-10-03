@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// timed spider
 func timedSpider() {
 	for {
 		now := time.Now()
@@ -19,6 +20,10 @@ func timedSpider() {
 }
 
 func main() {
+	go func() {
+		timedSpider()
+	}()
+
 	router := gin.Default()
 
 	// middleware
