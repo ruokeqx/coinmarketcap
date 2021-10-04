@@ -214,8 +214,15 @@ func spider(concurrent int64, choice string, hts int64, flag bool) {
 		go func(coin_name string) {
 			// 获取id
 			s.Acquire(context.Background(), 1)
-			url := fmt.Sprintf(market_url, coin_name)
-			id := GetId(Download(url))
+			// 先从数据库查 没有再爬
+			tc := Coin{}
+			id := 0
+			db.AutoMigrate(&Coin{})
+			db.Where("name = ?", coin_name).First(&tc)
+			if tc.Id == 0 {
+				url := fmt.Sprintf(market_url, coin_name)
+				id = GetId(Download(url))
+			}
 			if id == 0 {
 				s.Release(1)
 				w.Done()
@@ -227,6 +234,7 @@ func spider(concurrent int64, choice string, hts int64, flag bool) {
 
 			// 获取图表数据
 			// choice := "7D"
+			// HasTable避免初始化时重复爬 flag使调定时爬虫时能加入新数据
 			if flag || !db.HasTable("chart-"+coin_name) {
 				ParserChartData(db, coin_name, chart_url, id, choice)
 			}
