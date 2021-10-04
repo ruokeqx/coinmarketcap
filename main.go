@@ -15,7 +15,7 @@ func timedSpider() {
 		next = time.Date(next.Year(), next.Month(), next.Day(), 8, 30, 0, 0, next.Location())
 		t := time.NewTimer(next.Sub(now))
 		<-t.C
-		spider(int64(3), "1D", int64(time.Now().Unix()-86400), false)
+		spider(int64(3), "1D", int64(time.Now().Unix()-86400), true)
 	}
 }
 

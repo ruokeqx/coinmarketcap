@@ -227,14 +227,14 @@ func spider(concurrent int64, choice string, hts int64, flag bool) {
 
 			// 获取图表数据
 			// choice := "7D"
-			if flag && !db.HasTable("chart-"+coin_name) {
+			if flag || !db.HasTable("chart-"+coin_name) {
 				ParserChartData(db, coin_name, chart_url, id, choice)
 			}
 			// os.Exit(0)
 
 			// 获取历史数据
 			// hts := int64(1577808000)
-			if flag && !db.HasTable("history-"+coin_name) {
+			if flag || !db.HasTable("history-"+coin_name) {
 				GetHistoryData(db, coin_name, historical_url, id, hts)
 			}
 
@@ -246,5 +246,5 @@ func spider(concurrent int64, choice string, hts int64, flag bool) {
 }
 
 func main() {
-	spider(int64(3), "7D", int64(1577808000), true)
+	spider(int64(3), "7D", int64(1577808000), false)
 }
