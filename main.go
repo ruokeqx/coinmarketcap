@@ -20,10 +20,6 @@ func timedSpider() {
 }
 
 func main() {
-	go func() {
-		timedSpider()
-	}()
-
 	router := gin.Default()
 
 	// middleware

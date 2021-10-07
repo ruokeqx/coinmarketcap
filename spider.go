@@ -253,6 +253,6 @@ func spider(concurrent int64, choice string, hts int64, flag bool) {
 	w.Wait() // 等待所有任务的完成  即计数器值为0
 }
 
-func main() {
-	spider(int64(3), "7D", int64(1577808000), false)
-}
+// func main() {
+// 	spider(int64(3), "7D", int64(1577808000), false)
+// }
