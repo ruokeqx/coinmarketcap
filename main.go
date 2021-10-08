@@ -1,25 +1,113 @@
 package main
 
 import (
+	"bufio"
+	"container/list"
+	"fmt"
+	"io"
 	"log"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/robfig/cron/v3"
+	"github.com/streadway/amqp"
 )
 
+type CallJob struct {
+	coins *list.List
+	ch    *amqp.Channel
+}
+
 // timed spider
-func timedSpider() {
-	for {
-		now := time.Now()
-		next := now.Add(time.Hour * 24)
-		next = time.Date(next.Year(), next.Month(), next.Day(), 8, 30, 0, 0, next.Location())
-		t := time.NewTimer(next.Sub(now))
-		<-t.C
-		spider(int64(3), "1D", int64(time.Now().Unix()-86400), true)
+func (c CallJob) Run() {
+	coins := c.coins
+	ch := c.ch
+	// spider(int64(3), "1D", int64(time.Now().Unix()-86400), true)
+	for coin := coins.Front(); coin != nil; coin = coin.Next() {
+		body := coin.Value.(string) + " 1D " + strconv.FormatInt(int64(time.Now().Unix()-86400), 10) + " 1"
+		err := ch.Publish(
+			"",        // exchange
+			"dspider", // routing key
+			false,     // mandatory
+			false,     // immediate
+			amqp.Publishing{
+				ContentType: "text/plain",
+				Body:        []byte(body),
+			})
+		errprint("filed to publish a message: ", err)
+		log.Printf(" [x] Sent %s", body)
+	}
+}
+
+func errprint(msg string, err error) {
+	if err != nil {
+		log.Fatalf("%s: %s", msg, err)
 	}
 }
 
 func main() {
+	// 从coins.txt中读取coin名称并保存到列表
+	var coins = list.New()
+	file, err := os.Open("./coins.txt") // Open用于读取文件  默认具有Read的文件描述符
+	if err != nil {
+		fmt.Printf("File Open Error:%v\n", err)
+		return
+	}
+	defer file.Close() //滞后关闭
+	reader := bufio.NewReader(file)
+	for {
+		coin_name, err := reader.ReadString('\n') // 读到一个换行就结束
+		if err == io.EOF {
+			break
+		}
+		coin_name = strings.Trim(coin_name, "\r\n") // 去除前后换行符,这里巨坑
+		coins.PushBack(coin_name)
+	}
+	fmt.Println("File Read Success")
+
+	// rabbitmq
+	conn, err := amqp.Dial("amqp://guest:guest@192.168.1.107:5672/")
+	errprint("connect error: ", err)
+	defer conn.Close()
+	ch, err := conn.Channel()
+	errprint("failed to oepn a channel: ", err)
+	_, err = ch.QueueDeclare(
+		"dspider", // name
+		false,     // durable
+		false,     // delete when unused
+		false,     // exclusive
+		false,     // no-wait
+		nil,       // arguments
+	)
+	errprint("failed to declare queue: ", err)
+	for coin := coins.Front(); coin != nil; coin = coin.Next() {
+		body := coin.Value.(string) + " 7D 1577808000 0"
+		err = ch.Publish(
+			"",        // exchange
+			"dspider", // routing key
+			false,     // mandatory
+			false,     // immediate
+			amqp.Publishing{
+				ContentType: "text/plain",
+				Body:        []byte(body),
+			})
+		errprint("filed to publish a message: ", err)
+		log.Printf(" [x] Sent %s", body)
+	}
+
+	cron := cron.New()
+	cron.AddJob("30 9 * * *", CallJob{
+		coins: coins,
+		ch:    ch,
+	})
+	//启动/关闭
+	cron.Start()
+	defer cron.Stop()
+
+	// gin server
 	router := gin.Default()
 
 	// middleware
