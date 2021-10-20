@@ -102,14 +102,7 @@ func latest(c *gin.Context) {
 // data to paint chart
 func chart(c *gin.Context) {
 	// /data-api/v3/cryptocurrency/detail/chart?coinName=(?)&range=(?)&convertId=(?)
-	db, err := sqlInit()
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code": http.StatusBadRequest,
-			"msg":  "Database connect error!",
-		})
-		return
-	}
+	db := sqlInit()
 	defer db.Close()
 	coinName := c.Query("coinName")
 	if !db.HasTable("chart-" + coinName) {

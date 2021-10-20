@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
@@ -49,16 +50,29 @@ type CoinHistoricalQuote struct {
 	// timestamp string
 }
 
-func sqlInit() (db *gorm.DB, err error) {
+type UserTable struct {
+	Username string `json:"username"`
+	PwdHash  string `json:"password"`
+}
+
+var (
+	once sync.Once
+	db   *gorm.DB
+)
+
+func sqlInit() (db *gorm.DB) {
 	// 创建数据库连接
 	// db, err = gorm.Open("mysql", "ruokeqx:ruokeqx666@(121.196.208.97:3306)/ruokeqx?charset=utf8mb4&parseTime=True&loc=Local")
-	db, err = gorm.Open("mysql", "root:root@(127.0.0.1:3306)/db1?charset=utf8mb4&parseTime=True&loc=Local")
-	if err != nil {
-		fmt.Print("Connect database error!")
-		return
-	}
+	once.Do(func() {
+		var err error
+		db, err = gorm.Open("mysql", "root:root@(192.168.43.16:3306)/db1?charset=utf8mb4&parseTime=True&loc=Local")
+		if err != nil {
+			panic("Connect database error!")
+		}
+	})
+
 	// defer db.Close()
-	return db, err
+	return db
 }
 
 // 存入coin_name及其对应的id
@@ -105,4 +119,14 @@ func InsertHistory(db *gorm.DB, quote CoinHistoricalQuote) {
 	} else {
 		fmt.Println(quote, "already exists!")
 	}
+}
+
+func InsertUserInfo(db *gorm.DB, user *UserTable) {
+	if !db.HasTable("Users") {
+		db.Table("Users").CreateTable(&UserTable{})
+	}
+
+	db.Table("Users").Create(user)
+	fmt.Println(user, "insert success!")
+
 }
