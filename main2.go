@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
@@ -41,7 +42,7 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	pwdhash, err := Encrypt(mAuth.PassWord)
+	pwdhash, err := AesEncrypt([]byte(mAuth.PassWord))
 	if err != nil {
 		fmt.Print(err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -52,7 +53,7 @@ func Register(c *gin.Context) {
 
 	user_info := UserTable{
 		Username: mAuth.UserName,
-		PwdHash:  pwdhash,
+		PwdHash:  hex.EncodeToString(pwdhash),
 	}
 	// 注册
 	InsertUserInfo(db, &user_info)
@@ -100,8 +101,8 @@ func Login(c *gin.Context) {
 		})
 		return
 	}
-
-	pwdhash, err := Encrypt(mAuth.PassWord)
+	pwd, _ := hex.DecodeString(tmp_user.PwdHash)
+	pwd, err := AesDecrypt(pwd)
 	if err != nil {
 		fmt.Print(err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -112,8 +113,8 @@ func Login(c *gin.Context) {
 	}
 
 	// 登录失败
-	if pwdhash != tmp_user.PwdHash {
-		fmt.Printf("Login Error:%s %s", pwdhash, tmp_user.PwdHash)
+	if string(pwd) != mAuth.PassWord {
+		fmt.Printf("Login Error:%s %s", string(pwd), mAuth.PassWord)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code": http.StatusInternalServerError,
 			"msg":  "PassWord Error!",
