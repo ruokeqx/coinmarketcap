@@ -103,7 +103,6 @@ func latest(c *gin.Context) {
 func chart(c *gin.Context) {
 	// /data-api/v3/cryptocurrency/detail/chart?coinName=(?)&range=(?)&convertId=(?)
 	db := sqlInit()
-	defer db.Close()
 	coinName := c.Query("coinName")
 	if !db.HasTable("chart-" + coinName) {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -179,15 +178,7 @@ func chart(c *gin.Context) {
 
 // historical data
 func historical(c *gin.Context) {
-	db, err := sqlInit()
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code": http.StatusBadRequest,
-			"msg":  "Database connect error!",
-		})
-		return
-	}
-	defer db.Close()
+	db := sqlInit()
 	coinName := c.Query("coinName")
 	if !db.HasTable("history-" + coinName) {
 		c.JSON(http.StatusBadRequest, gin.H{

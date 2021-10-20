@@ -60,12 +60,12 @@ var (
 	db   *gorm.DB
 )
 
-func sqlInit() (db *gorm.DB) {
+func sqlInit() *gorm.DB {
 	// 创建数据库连接
 	// db, err = gorm.Open("mysql", "ruokeqx:ruokeqx666@(121.196.208.97:3306)/ruokeqx?charset=utf8mb4&parseTime=True&loc=Local")
 	once.Do(func() {
 		var err error
-		db, err = gorm.Open("mysql", "root:root@(192.168.43.16:3306)/db1?charset=utf8mb4&parseTime=True&loc=Local")
+		db, err = gorm.Open("mysql", "root:root@(192.168.0.165:3306)/db1?charset=utf8mb4&parseTime=True&loc=Local")
 		if err != nil {
 			panic("Connect database error!")
 		}

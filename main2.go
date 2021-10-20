@@ -28,10 +28,9 @@ func Register(c *gin.Context) {
 		})
 		return
 	}
-
 	db := sqlInit()
-	var tmp_user UserTable
-	db.Where("name = ?", mAuth.UserName).First(&tmp_user)
+	tmp_user := UserTable{}
+	db.Table("Users").Where("username = ?", mAuth.UserName).First(&tmp_user)
 
 	// 判断是否存在
 	if tmp_user.PwdHash != "" {
@@ -86,8 +85,12 @@ func Login(c *gin.Context) {
 	}
 
 	db := sqlInit()
-	var tmp_user UserTable
-	db.Where("name = ?", mAuth.UserName).First(&tmp_user)
+	tmp_user := UserTable{}
+	if db == nil {
+		fmt.Println("db nil")
+		return
+	}
+	db.Table("Users").Where("username = ?", mAuth.UserName).First(&tmp_user)
 
 	// 判断是否存在
 	if tmp_user.PwdHash == "" {
@@ -105,6 +108,7 @@ func Login(c *gin.Context) {
 			"code": http.StatusInternalServerError,
 			"msg":  err,
 		})
+		return
 	}
 
 	// 登录失败
@@ -114,6 +118,7 @@ func Login(c *gin.Context) {
 			"code": http.StatusInternalServerError,
 			"msg":  "PassWord Error!",
 		})
+		return
 	}
 
 	// 生成token
@@ -124,6 +129,7 @@ func Login(c *gin.Context) {
 			"code": http.StatusInternalServerError,
 			"msg":  "GenerateToken Error!",
 		})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
