@@ -1,5 +1,12 @@
 This is `coinmarketcap` distributed spider and webserver Golang edition.
 
+## Environment
+
+```bash
+mysql
+rabbitmq
+go
+```
 
 ## Usage:
 
@@ -12,5 +19,5 @@ go run dspider.go spider.go sqlutil.go
 
 ```bash
 # To run server
-go run main.go router.go sqlutil.go spider.go
+go run main.go router.go sqlutil.go encrypt.go
 ```
