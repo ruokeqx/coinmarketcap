@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/list"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -10,6 +11,8 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 )
+
+var TokenList = list.New()
 
 type auth struct {
 	// UserName 用户名
@@ -133,6 +136,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	TokenList.PushBack(token) // 将生成的token存入TokenList中
 	c.JSON(http.StatusOK, gin.H{
 		"code": http.StatusOK,
 		"msg":  "Login Success!",
@@ -172,6 +176,29 @@ func GenerateToken(loginName string) (string, error) {
 	return tokenClaims.SignedString(jwtSecret)
 }
 
+func TokenAuthMiddleware(c *gin.Context) {
+
+	fmt.Println("TokenAuthMiddleware")
+
+	token := c.Request.FormValue("token") // 查找请求中是否有token
+	if token != "" {
+		for i := TokenList.Front(); i != nil; i = i.Next() {
+			if i.Value == token {
+				fmt.Println("Token Auth Success!")
+				return
+			}
+		}
+	}
+
+	c.JSON(http.StatusInternalServerError, gin.H{
+		"code": 401,
+		"msg":  "Token Auth Failed!",
+	})
+	// Pass on to the next-in-chain
+	c.Next()
+
+}
+
 func main() {
 
 	// gin server
@@ -186,6 +213,7 @@ func main() {
 	router.POST("/register", Register)
 	router.POST("/login", Login)
 
+	router.Use(TokenAuthMiddleware)
 	if err := router.Run(":8080"); err != nil {
 		log.Fatal("failed run app: ", err)
 	}
