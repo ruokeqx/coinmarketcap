@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 )
@@ -53,6 +54,19 @@ type CoinHistoricalQuote struct {
 type UserTable struct {
 	Username string `json:"username"`
 	PwdHash  string `json:"password"`
+}
+
+type auth struct {
+	// UserName 用户名
+	UserName string `json:"username" example:"zhangsan" validate:"required,gte=5,lte=30"`
+	// PassWord 密码
+	PassWord string `json:"password" example:"zhangsan" validate:"required,gte=5,lte=30"`
+}
+
+// Claims 声明
+type Claims struct {
+	LoginName []byte `json:"loginname"`
+	jwt.StandardClaims
 }
 
 var (

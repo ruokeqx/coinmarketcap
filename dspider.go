@@ -51,11 +51,7 @@ func main() {
 	errprint("Failed to register a consumer", err)
 
 	// 创建数据库连接
-	db, err := sqlInit()
-	if err != nil {
-		fmt.Println("database connect error!")
-	}
-	defer db.Close()
+	db := sqlInit()
 
 	// 允许三个并发
 	s := semaphore.NewWeighted(3)

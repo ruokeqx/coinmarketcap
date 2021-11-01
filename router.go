@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -211,4 +212,157 @@ func historical(c *gin.Context) {
 			return
 		}
 	}
+}
+
+/*
+++++++++++++++
++ login part +
+++++++++++++++
+*/
+
+func Register(c *gin.Context) {
+	var mAuth auth
+
+	// 解析 body json 数据到实体类
+	if err := c.ShouldBindJSON(&mAuth); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": http.StatusInternalServerError,
+			"msg":  err,
+		})
+		return
+	}
+	db := sqlInit()
+	tmp_user := UserTable{}
+	db.Table("Users").Where("username = ?", mAuth.UserName).First(&tmp_user)
+
+	// 判断是否存在
+	if tmp_user.PwdHash != "" {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": http.StatusInternalServerError,
+			"msg":  "User Registered",
+		})
+		return
+	}
+
+	pwdhash, err := AesEncrypt([]byte(mAuth.PassWord))
+	if err != nil {
+		fmt.Print(err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": http.StatusInternalServerError,
+			"msg":  err,
+		})
+	}
+
+	user_info := UserTable{
+		Username: mAuth.UserName,
+		PwdHash:  hex.EncodeToString(pwdhash),
+	}
+	// 注册
+	InsertUserInfo(db, &user_info)
+
+	// 注册成功之后 make token
+	token, err := GenerateToken(mAuth.UserName)
+	if err != nil {
+		fmt.Print(err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": http.StatusInternalServerError,
+			"msg":  err,
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"code": http.StatusOK,
+		"msg":  "Registry Success!",
+		"data": token,
+	})
+}
+
+func Login(c *gin.Context) {
+	var mAuth auth
+	if err := c.ShouldBindJSON(&mAuth); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": http.StatusInternalServerError,
+			"msg":  err,
+		})
+		return
+	}
+
+	db := sqlInit()
+	tmp_user := UserTable{}
+	if db == nil {
+		fmt.Println("db nil")
+		return
+	}
+	db.Table("Users").Where("username = ?", mAuth.UserName).First(&tmp_user)
+
+	// 判断是否存在
+	if tmp_user.PwdHash == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": http.StatusInternalServerError,
+			"msg":  "User not Registered!",
+		})
+		return
+	}
+	pwd, _ := hex.DecodeString(tmp_user.PwdHash)
+	pwd, err := AesDecrypt(pwd)
+	if err != nil {
+		fmt.Print(err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": http.StatusInternalServerError,
+			"msg":  err,
+		})
+		return
+	}
+
+	// 登录失败
+	if string(pwd) != mAuth.PassWord {
+		fmt.Printf("Login Error:%s %s", string(pwd), mAuth.PassWord)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": http.StatusInternalServerError,
+			"msg":  "PassWord Error!",
+		})
+		return
+	}
+
+	// 生成token
+	token, merr := GenerateToken(tmp_user.Username)
+	if merr != nil {
+		fmt.Print(err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code": http.StatusInternalServerError,
+			"msg":  "GenerateToken Error!",
+		})
+		return
+	}
+
+	TokenList.PushBack(token) // 将生成的token存入TokenList中
+	c.JSON(http.StatusOK, gin.H{
+		"code": http.StatusOK,
+		"msg":  "Login Success!",
+		"data": token,
+	})
+}
+
+func TokenAuthMiddleware(c *gin.Context) {
+
+	fmt.Println("TokenAuthMiddleware")
+
+	token := c.Request.Header.Get("token") // 查找请求中是否有token
+	fmt.Println(token)
+	if token != "" {
+		for i := TokenList.Front(); i != nil; i = i.Next() {
+			if i.Value == token {
+				fmt.Println("Token Auth Success!")
+				c.Next()
+				return
+			}
+		}
+	}
+
+	c.JSON(http.StatusInternalServerError, gin.H{
+		"code": 401,
+		"msg":  "Token Auth Failed!",
+	})
+	// Pass on to the next-in-chain
+	c.Abort()
 }

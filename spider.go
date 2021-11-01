@@ -1,26 +1,19 @@
 package main
 
 import (
-	"bufio"
-	"container/list"
-	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/bitly/go-simplejson"
 	"github.com/jinzhu/gorm"
-	"golang.org/x/sync/semaphore"
 )
 
 var market_url = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/market-pairs/latest?slug=%s&start=1&limit=100&category=spot&sort=cmc_rank_advanced"
@@ -176,81 +169,6 @@ func GetHistoryData(db *gorm.DB, coin_name string, url string, id int, timeStart
 		// fmt.Printf("%v\n", quote)
 		InsertHistory(db, quote)
 	}
-}
-
-func spider(concurrent int64, choice string, hts int64, flag bool) {
-	// 创建数据库连接
-	db, err := sqlInit()
-	if err != nil {
-		fmt.Println("database connect error!")
-	}
-	defer db.Close()
-	// 从coins.txt中读取coin名称并保存到列表
-	var coins = list.New()
-	file, err := os.Open("./coins.txt") // Open用于读取文件  默认具有Read的文件描述符
-	if err != nil {
-		fmt.Printf("File Open Error:%v\n", err)
-		return
-	}
-	defer file.Close() //滞后关闭
-	reader := bufio.NewReader(file)
-	for {
-		coin_name, err := reader.ReadString('\n') // 读到一个换行就结束
-		if err == io.EOF {
-			break
-		}
-		coin_name = strings.Trim(coin_name, "\r\n") // 去除前后换行符,这里巨坑
-		// coin_name = strings.Replace(coin_name, "\n", "", 1)
-		// fmt.Println(coin_name)
-		coins.PushBack(coin_name)
-	}
-	fmt.Println("File Read Success")
-
-	// 遍历列表  并发获取id和数据
-	s := semaphore.NewWeighted(concurrent) // 并发限制为3
-	var w sync.WaitGroup                   // 等待组
-	for coin := coins.Front(); coin != nil; coin = coin.Next() {
-		w.Add(1) // 每启动一个新任务  等待组加一
-		go func(coin_name string) {
-			// 获取id
-			s.Acquire(context.Background(), 1)
-			// 先从数据库查 没有再爬
-			tc := Coin{}
-			id := 0
-			db.AutoMigrate(&Coin{})
-			db.Where("name = ?", coin_name).First(&tc)
-			if tc.Id == 0 {
-				url := fmt.Sprintf(market_url, coin_name)
-				id = GetId(Download(url))
-			}
-			if id == 0 {
-				s.Release(1)
-				w.Done()
-				return
-			}
-
-			//存储coin_name及其对应id
-			InsertCoin(db, coin_name, id)
-
-			// 获取图表数据
-			// choice := "7D"
-			// HasTable避免初始化时重复爬 flag使调定时爬虫时能加入新数据
-			if flag || !db.HasTable("chart-"+coin_name) {
-				ParserChartData(db, coin_name, chart_url, id, choice)
-			}
-			// os.Exit(0)
-
-			// 获取历史数据
-			// hts := int64(1577808000)
-			if flag || !db.HasTable("history-"+coin_name) {
-				GetHistoryData(db, coin_name, historical_url, id, hts)
-			}
-
-			s.Release(1) // 释放信号量锁
-			w.Done()     // 设置等待组完成一项任务
-		}(coin.Value.(string))
-	}
-	w.Wait() // 等待所有任务的完成  即计数器值为0
 }
 
 // func main() {

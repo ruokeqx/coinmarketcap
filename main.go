@@ -11,10 +11,38 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron/v3"
 	"github.com/streadway/amqp"
 )
+
+var TokenList = list.New()
+var jwtSecret = []byte("JwtSecret")
+
+// GenerateToken 生成 token
+func GenerateToken(loginName string) (string, error) {
+	var err error
+	aesLoginName, err := AesEncrypt([]byte(loginName))
+	if err != nil {
+		return "", err
+	}
+
+	// 现在的时间
+	nowTime := time.Now()
+	// 过期的时间
+	expireTime := nowTime.Add(3 * time.Hour)
+	// 初始化 声明
+	claims := Claims{
+		aesLoginName, jwt.StandardClaims{
+			ExpiresAt: expireTime.Unix(),
+			Issuer:    "aims",
+		},
+	}
+	tokenClaims := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	// 获取完整签名之后的 token
+	return tokenClaims.SignedString(jwtSecret)
+}
 
 type CallJob struct {
 	coins *list.List
@@ -42,32 +70,7 @@ func (c CallJob) Run() {
 	}
 }
 
-func errprint(msg string, err error) {
-	if err != nil {
-		log.Fatalf("%s: %s", msg, err)
-	}
-}
-
-func main() {
-	// 从coins.txt中读取coin名称并保存到列表
-	var coins = list.New()
-	file, err := os.Open("./coins.txt") // Open用于读取文件  默认具有Read的文件描述符
-	if err != nil {
-		fmt.Printf("File Open Error:%v\n", err)
-		return
-	}
-	defer file.Close() //滞后关闭
-	reader := bufio.NewReader(file)
-	for {
-		coin_name, err := reader.ReadString('\n') // 读到一个换行就结束
-		if err == io.EOF {
-			break
-		}
-		coin_name = strings.Trim(coin_name, "\r\n") // 去除前后换行符,这里巨坑
-		coins.PushBack(coin_name)
-	}
-	fmt.Println("File Read Success")
-
+func mqwithcron(coins *list.List) {
 	// rabbitmq
 	conn, err := amqp.Dial("amqp://guest:guest@192.168.1.107:5672/")
 	errprint("connect error: ", err)
@@ -106,12 +109,44 @@ func main() {
 	//启动/关闭
 	cron.Start()
 	defer cron.Stop()
+}
+
+func errprint(msg string, err error) {
+	if err != nil {
+		log.Fatalf("%s: %s", msg, err)
+	}
+}
+
+func main() {
+	// 从coins.txt中读取coin名称并保存到列表
+	var coins = list.New()
+	file, err := os.Open("./coins.txt") // Open用于读取文件  默认具有Read的文件描述符
+	if err != nil {
+		fmt.Printf("File Open Error:%v\n", err)
+		return
+	}
+	defer file.Close() //滞后关闭
+	reader := bufio.NewReader(file)
+	for {
+		coin_name, err := reader.ReadString('\n') // 读到一个换行就结束
+		if err == io.EOF {
+			break
+		}
+		coin_name = strings.Trim(coin_name, "\r\n") // 去除前后换行符,这里巨坑
+		coins.PushBack(coin_name)
+	}
+	fmt.Println("File Read Success")
+
+	// dspider
+	// mqwithcron(coins)
 
 	// gin server
 	router := gin.Default()
 
 	// middleware
 	router.Use(CORSMiddleware())
+
+	// get access of these api after login with token in request header
 
 	/*
 		websocket api
@@ -121,7 +156,7 @@ func main() {
 		ret
 			{ "id":"price","d":{"cr":{"id":1027,"d":18.377500,"p1h":-0.06657870953600,"p24h":0.64696978759100,"p7d":-3.12034341889800,"p30d":null,"ts":null,"as":null,"fmc":null,"mc":353455376506.3070840369470325028557196526469562217300733894480,"mc24hpc":null,"vol24hpc":null,"fmc24hpc":null,"p":3001.9120231238236978753265827306660050872345303020,"v":16843485653.9349384307861328125},"t":1633058777656},"s":"0"}
 	*/
-	router.GET("/price/latest", latest)
+	router.GET("/price/latest", TokenAuthMiddleware, latest)
 	/*
 		api
 			/data-api/v3/cryptocurrency/detail/chart?coinName=(?)&range=(?)&convertId=(?)
@@ -159,7 +194,7 @@ func main() {
 				}
 			]
 	*/
-	router.GET("/data-api/v3/cryptocurrency/detail/chart", chart)
+	router.GET("/data-api/v3/cryptocurrency/detail/chart", TokenAuthMiddleware, chart)
 	/*
 		api
 			/data-api/v3/cryptocurrency/historical?coinName=(?)&timeStart=(?)&timeEnd=(?)
@@ -213,7 +248,38 @@ func main() {
 				}
 			]
 	*/
-	router.GET("/data-api/v3/cryptocurrency/historical", historical)
+	router.GET("/data-api/v3/cryptocurrency/historical", TokenAuthMiddleware, historical)
+
+	/*
+		register api
+		post data
+			{
+				"username":"ruokeqx",
+				"password":"2019339964026"
+			}
+		ret
+			{
+				"code": http.StatusOK,
+				"msg":  "Registry Success!",
+				"data": token,
+			}
+	*/
+	router.POST("/register", Register)
+	/*
+		login api
+		post data
+			{
+				"username":"ruokeqx",
+				"password":"2019339964026"
+			}
+		ret
+			{
+				"code": http.StatusOK,
+				"msg":  "Login Success!",
+				"data": token,
+			}
+	*/
+	router.POST("/login", Login)
 
 	if err := router.Run(":8080"); err != nil {
 		log.Fatal("failed run app: ", err)
