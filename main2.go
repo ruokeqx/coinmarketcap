@@ -34,6 +34,7 @@ func Register(c *gin.Context) {
 	}
 	db := sqlInit()
 	tmp_user := UserTable{}
+	fmt.Println("init success")
 	db.Table("Users").Where("username = ?", mAuth.UserName).First(&tmp_user)
 
 	// 判断是否存在
@@ -180,11 +181,13 @@ func TokenAuthMiddleware(c *gin.Context) {
 
 	fmt.Println("TokenAuthMiddleware")
 
-	token := c.Request.FormValue("token") // 查找请求中是否有token
+	token := c.Request.Header.Get("token") // 查找请求中是否有token
+	fmt.Println(token)
 	if token != "" {
 		for i := TokenList.Front(); i != nil; i = i.Next() {
 			if i.Value == token {
 				fmt.Println("Token Auth Success!")
+				c.Next()
 				return
 			}
 		}
@@ -195,8 +198,7 @@ func TokenAuthMiddleware(c *gin.Context) {
 		"msg":  "Token Auth Failed!",
 	})
 	// Pass on to the next-in-chain
-	c.Next()
-
+	c.Abort()
 }
 
 func main() {
@@ -206,14 +208,13 @@ func main() {
 
 	// middleware
 	router.Use(CORSMiddleware())
-	router.GET("/price/latest", latest)
-	router.GET("/data-api/v3/cryptocurrency/detail/chart", chart)
-	router.GET("/data-api/v3/cryptocurrency/historical", historical)
+	router.GET("/price/latest", TokenAuthMiddleware, latest)
+	router.GET("/data-api/v3/cryptocurrency/detail/chart", TokenAuthMiddleware, chart)
+	router.GET("/data-api/v3/cryptocurrency/historical", TokenAuthMiddleware, historical)
 
 	router.POST("/register", Register)
 	router.POST("/login", Login)
 
-	router.Use(TokenAuthMiddleware)
 	if err := router.Run(":8080"); err != nil {
 		log.Fatal("failed run app: ", err)
 	}
