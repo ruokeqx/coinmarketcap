@@ -281,6 +281,45 @@ func main() {
 	*/
 	router.POST("/login", Login)
 
+	/*
+		chart_page api
+		post data
+			{
+				"coinName":,
+				"pages":,
+				"limits":,
+			}
+	*/
+	router.GET("/data-api/v3/cryptocurrency/chart_page", TokenAuthMiddleware, chart_page)
+
+	/*
+		historical_page api
+		post data
+			{
+				"coinName":,
+				"pages":,
+				"limits":,
+			}
+	*/
+	router.GET("/data-api/v3/cryptocurrency/historical_page", TokenAuthMiddleware, historical_page)
+
+	/*
+		like_get api	get with token
+		like_add
+			post data
+				{
+					"coinName":,
+				}
+		like_del
+			post data
+				{
+					"coinName":,
+				}
+	*/
+	router.GET("/data-api/v3/cryptocurrency/like", TokenAuthMiddleware, like_get)
+	router.POST("/data-api/v3/cryptocurrency/like", TokenAuthMiddleware, like_add)
+	router.DELETE("/data-api/v3/cryptocurrency/like", TokenAuthMiddleware, like_del)
+
 	if err := router.Run(":8080"); err != nil {
 		log.Fatal("failed run app: ", err)
 	}

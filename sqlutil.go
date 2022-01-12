@@ -13,7 +13,10 @@ type Coin struct {
 	Name string `gorm:"primary_key"`
 	Id   int
 }
-
+type CoinLike struct {
+	Username string
+	Coinname string
+}
 type CoinPointQuote struct {
 	Id          int
 	Name        string
@@ -54,6 +57,7 @@ type CoinHistoricalQuote struct {
 type UserTable struct {
 	Username string `json:"username"`
 	PwdHash  string `json:"password"`
+	Token    string `json:"token"`
 }
 
 type auth struct {
@@ -79,7 +83,7 @@ func sqlInit() *gorm.DB {
 	// db, err = gorm.Open("mysql", "ruokeqx:ruokeqx666@(121.196.208.97:3306)/ruokeqx?charset=utf8mb4&parseTime=True&loc=Local")
 	once.Do(func() {
 		var err error
-		db, err = gorm.Open("mysql", "root:root@(127.0.0.1:3306)/db1?charset=utf8mb4&parseTime=True&loc=Local")
+		db, err = gorm.Open("mysql", "root:root@(192.168.0.197:3306)/db1?charset=utf8mb4&parseTime=True&loc=Local")
 		if err != nil {
 			panic("Connect database error!")
 		}

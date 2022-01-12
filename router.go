@@ -336,6 +336,7 @@ func Login(c *gin.Context) {
 	}
 
 	TokenList.PushBack(token) // 将生成的token存入TokenList中
+	db.Table("Users").Where("username = ?", mAuth.UserName).Update("token", token)
 	c.JSON(http.StatusOK, gin.H{
 		"code": http.StatusOK,
 		"msg":  "Login Success!",
@@ -345,17 +346,25 @@ func Login(c *gin.Context) {
 
 func TokenAuthMiddleware(c *gin.Context) {
 
+	tmp_user := UserTable{}
 	fmt.Println("TokenAuthMiddleware")
 
 	token := c.Request.Header.Get("token") // 查找请求中是否有token
 	fmt.Println(token)
 	if token != "" {
-		for i := TokenList.Front(); i != nil; i = i.Next() {
-			if i.Value == token {
-				fmt.Println("Token Auth Success!")
-				c.Next()
-				return
-			}
+		// for i := TokenList.Front(); i != nil; i = i.Next() {
+		// 	if i.Value == token {
+		// 		fmt.Println("Token Auth Success!")
+		// 		c.Next()
+		// 		return
+		// 	}
+		// }
+
+		// 查询是否有用户的token是这个
+		db.Table("Users").Where("token = ?", token).First(&tmp_user)
+		if tmp_user.Token != "" {
+			c.Next()
+			return
 		}
 	}
 
@@ -469,4 +478,74 @@ func historical_page(c *gin.Context) {
 			return
 		}
 	}
+}
+
+// 获取用户收藏
+func like_get(c *gin.Context) {
+	db := sqlInit()
+	// 根据token获取用户名
+	token := c.Request.Header.Get("token")
+	tmp_user := UserTable{}
+	db.Table("Users").Where("token = ?", token).First(&tmp_user)
+	username := tmp_user.Username
+
+	// 查找用户所有收藏的币
+	var coinlike []CoinLike
+	db.Table("CoinLikes").Where("username = ?", username).Find(&coinlike)
+	if len(coinlike) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "No data now!",
+		})
+		return
+	} else {
+		b, err := json.Marshal(coinlike)
+		if err != nil {
+			fmt.Println("query result convert to json error!")
+		} else {
+			c.Writer.Write(b)
+			return
+		}
+	}
+}
+
+// 添加收藏
+func like_add(c *gin.Context) {
+
+	if !db.HasTable("CoinLikes") {
+		db.Table("CoinLikes").CreateTable(&CoinLike{})
+	}
+
+	token := c.Request.Header.Get("token")
+	tmp_user := UserTable{}
+	db.Table("Users").Where("token = ?", token).First(&tmp_user)
+	username := tmp_user.Username
+
+	coinlike := CoinLike{
+		Username: username,
+		Coinname: c.PostForm("coinName"),
+	}
+	db.Table("CoinLikes").Create(coinlike)
+	// fmt.Println(coinlike, "insert success!")
+
+	c.JSON(http.StatusOK, gin.H{
+		"code": http.StatusOK,
+		"msg":  "add like success!",
+	})
+}
+
+// 删除收藏
+func like_del(c *gin.Context) {
+	token := c.Request.Header.Get("token")
+	tmp_user := UserTable{}
+	db.Table("Users").Where("token = ?", token).First(&tmp_user)
+	coinlike := CoinLike{
+		Username: tmp_user.Username,
+		Coinname: c.PostForm("coinName"),
+	}
+	db.Table("CoinLikes").Delete(&coinlike)
+	c.JSON(http.StatusOK, gin.H{
+		"code": http.StatusOK,
+		"msg":  "delete like success!",
+	})
 }
