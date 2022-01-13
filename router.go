@@ -335,7 +335,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	TokenList.PushBack(token) // 将生成的token存入TokenList中
+	// TokenList.PushBack(token) // 将生成的token存入TokenList中
 	db.Table("Users").Where("username = ?", mAuth.UserName).Update("token", token)
 	c.JSON(http.StatusOK, gin.H{
 		"code": http.StatusOK,
@@ -415,11 +415,12 @@ func TokenAuthMiddleware(c *gin.Context) {
 
 // data to paint chart
 func chart_page(c *gin.Context) {
-	// /data-api/v3/cryptocurrency/detail/chart?coinName=(?)&range=(?)&convertId=(?)
+	// /data-api/v3/cryptocurrency/chart_page
 	db := sqlInit()
-	coinName := c.PostForm("coinName")
-	pages, _ := strconv.Atoi(c.PostForm("pages"))
-	limits, _ := strconv.Atoi(c.PostForm("limits"))
+
+	coinName := c.Query("coinName")
+	pages, _ := strconv.Atoi(c.Query("pages"))
+	limits, _ := strconv.Atoi(c.Query("limits"))
 	if !db.HasTable("chart-" + coinName) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code": http.StatusBadRequest,
@@ -450,9 +451,9 @@ func chart_page(c *gin.Context) {
 // historical data
 func historical_page(c *gin.Context) {
 	db := sqlInit()
-	coinName := c.PostForm("coinName")
-	pages, _ := strconv.Atoi(c.PostForm("pages"))
-	limits, _ := strconv.Atoi(c.PostForm("limits"))
+	coinName := c.Query("coinName")
+	pages, _ := strconv.Atoi(c.Query("pages"))
+	limits, _ := strconv.Atoi(c.Query("limits"))
 	if !db.HasTable("history-" + coinName) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code": http.StatusBadRequest,
@@ -525,7 +526,13 @@ func like_add(c *gin.Context) {
 		Username: username,
 		Coinname: c.PostForm("coinName"),
 	}
-	db.Table("CoinLikes").Create(coinlike)
+	if err := db.Table("CoinLikes").Create(coinlike).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "like already exists!",
+		})
+	}
+
 	// fmt.Println(coinlike, "insert success!")
 
 	c.JSON(http.StatusOK, gin.H{
@@ -536,14 +543,19 @@ func like_add(c *gin.Context) {
 
 // 删除收藏
 func like_del(c *gin.Context) {
+	coinName := c.Query("coinName")
 	token := c.Request.Header.Get("token")
 	tmp_user := UserTable{}
 	db.Table("Users").Where("token = ?", token).First(&tmp_user)
-	coinlike := CoinLike{
-		Username: tmp_user.Username,
-		Coinname: c.PostForm("coinName"),
+	if coinName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "no coinname!",
+		})
+		return
 	}
-	db.Table("CoinLikes").Delete(&coinlike)
+	fmt.Println(token, coinName)
+	db.Table("CoinLikes").Where("username = ? and coinname = ?", tmp_user.Username, coinName).Delete(&CoinLike{})
 	c.JSON(http.StatusOK, gin.H{
 		"code": http.StatusOK,
 		"msg":  "delete like success!",
