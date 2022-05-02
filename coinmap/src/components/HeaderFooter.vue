@@ -42,4 +42,7 @@ body{
 .row{
   margin-top: 14px;
 }
+el-main{
+  overflow: hidden;
+}
 </style>

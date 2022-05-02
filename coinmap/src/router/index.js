@@ -5,9 +5,8 @@ const HeaderFooter = () => import('../components/HeaderFooter')
 const Cryptocurrency = () => import('../components/Cryptocurrency')
 const Charts = () => import('../components/Charts')
 const Cryptocurrency1 = () => import('../components/Cryptocurrency1.vue')
-const Charts1 = () => import('../components/Charts1')
+// const Charts1 = () => import('../components/Charts1')
 const Login = () => import('../components/Login')
-const Register = () => import('../components/Register')
 const Collection = () => import('../components/Collection')
 
 Vue.use(VueRouter)
@@ -19,10 +18,6 @@ const routes = [
   {
     path: '/login',
     component:Login
-  },
-  {
-    path: '/register',
-    component:Register
   },
   {
     path: '/cryptocurrency',
@@ -62,7 +57,6 @@ router.beforeEach((to,from,next) => {
   //  next() 放行  next('/login') 强制跳转到login
   if(to.path === '/login') return next();
   //获取token
-  if(to.path === '/register') return next();
   const tokenStr=window.sessionStorage.getItem('token');
   if(!tokenStr) return next('/login');
   next();

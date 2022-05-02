@@ -133,6 +133,7 @@ import { GetParam3 } from '../../public/page3-id'
 import { GetParam4 } from '../../public/page4-id'
 import { GetParam5 } from '../../public/page5-id'
 import { GetParam6 } from '../../public/page6-id'
+import wsUrl from '../config.js'
 export default {
   data () {
     return {
@@ -145,7 +146,7 @@ export default {
       page: 1,
       pagesize:20,
       index: 0,
-      path: 'ws://127.0.0.1:8080/price/latest',
+      path: wsUrl,
       socket: '',
       params: [],
       param1: GetParam1(),
