@@ -6,7 +6,7 @@ import 'element-ui/lib/theme-chalk/index.css'
 import './assets/fonts/iconfont.css'
 import axios from 'axios'
 import * as echarts from 'echarts'
-import baseUrl from './config.js'
+import {baseUrl} from './config.js'
 
 Vue.prototype.$echarts = echarts
 Vue.use(ElementUI)

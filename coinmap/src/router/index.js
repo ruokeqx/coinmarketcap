@@ -4,8 +4,8 @@ import VueRouter from 'vue-router'
 const HeaderFooter = () => import('../components/HeaderFooter')
 const Cryptocurrency = () => import('../components/Cryptocurrency')
 const Charts = () => import('../components/Charts')
-const Cryptocurrency1 = () => import('../components/Cryptocurrency1.vue')
-// const Charts1 = () => import('../components/Charts1')
+const CryptocurrencyDetail = () => import('../components/CryptocurrencyDetail.vue')
+const Asset = () => import('../components/Asset')
 const Login = () => import('../components/Login')
 const Collection = () => import('../components/Collection')
 
@@ -37,8 +37,12 @@ const routes = [
         component:Collection
       },
       {
-        path: '/cryptocurrency1',
-        component:Cryptocurrency1
+        path: '/cryptocurrency_detail',
+        component:CryptocurrencyDetail
+      },
+      {
+        path: '/asset',
+        component:Asset
       }
 
     ]
