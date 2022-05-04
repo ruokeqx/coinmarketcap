@@ -3,7 +3,7 @@
     <h1>详细数据</h1>
     <el-table
       :data="tableData"
-      style="text-algin:center; font-size: 15px"
+      style="text-algin:center; font-size: 15px; margin-top: 5px;"
       :header-cell-style="{ color: '#000000' }"
       :cell-style="{ color: '#000000' }"
       :row-style="{ height: 60 + 'px' }"
@@ -178,10 +178,4 @@ export default {
 </script>
 
 <style scoped>
-.el-table {
-  margin-top: 5px;
-}
-.user {
-  margin-left: 83%;
-}
 </style>

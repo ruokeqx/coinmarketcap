@@ -2027,8 +2027,4 @@ export default [
       "name": "Adventure-Gold",
       "id": 11568
     },
-    {
-      "name": "ruokeqx",
-      "id": 99999
-    }
   ]

@@ -2,7 +2,7 @@
   <div>
     <el-table
       :data="tableData"
-      style="width:80%;text-algin:center; margin-left: 10%; font-size: 15px"
+      style="text-algin:center;font-size: 15px;margin-top: 5px;"
       :header-cell-style="{ color: '#000000' }"
       :cell-style="{ color: '#000000' }"
       :row-style="{ height: 70 + 'px' }"
@@ -11,12 +11,6 @@
       //需要显示文字提示的表头列加上 :render-header="tipHelp"，tipHelp是一个方法
       <el-table-column prop="Index" width="50" align="center">
       </el-table-column>
-      <!-- <el-table-column
-      prop="Name"
-      label="Name"
-      align="center"
-    >
-    </el-table-column> -->
       <el-table-column prop="Name" label="Name" align="center"/>
       <el-table-column
         prop="Price"
@@ -25,12 +19,6 @@
         style="margin-right:5%"
       >
       </el-table-column>
-      <!-- <el-table-column
-      prop="h24"
-      label="24h %"
-      align="center"
-    >
-    </el-table-column> -->
       <el-table-column prop="h24" label="24h %" align="center">
         <template slot-scope="scope">
           <span
@@ -41,12 +29,6 @@
           <span v-else style="color: red">{{ scope.row.h24 }}</span>
         </template>
       </el-table-column>
-      <!-- <el-table-column
-      prop="d7"
-      label="7d %"
-      align="center"
-    >
-    </el-table-column> -->
       <el-table-column prop="d7" label="7d %" align="center">
         <template slot-scope="scope">
           <span
@@ -228,10 +210,4 @@ export default {
 </script>
 
 <style scoped>
-.el-table {
-  margin-top: 5px;
-}
-.user {
-  margin-left: 83%;
-}
 </style>
