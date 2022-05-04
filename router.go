@@ -1,15 +1,21 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/jinzhu/gorm"
 )
 
 func CORSMiddleware() gin.HandlerFunc {
@@ -103,7 +109,6 @@ func latest(c *gin.Context) {
 // data to paint chart
 func chart(c *gin.Context) {
 	// /data-api/v3/cryptocurrency/detail/chart?coinName=(?)&range=(?)&convertId=(?)
-	db := sqlInit()
 	coinName := c.Query("coinName")
 	if !db.HasTable("chart-" + coinName) {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -179,7 +184,6 @@ func chart(c *gin.Context) {
 
 // historical data
 func historical(c *gin.Context) {
-	db := sqlInit()
 	coinName := c.Query("coinName")
 	if !db.HasTable("history-" + coinName) {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -221,158 +225,112 @@ func historical(c *gin.Context) {
 */
 
 func Register(c *gin.Context) {
-	var mAuth auth
+	json := make(map[string]interface{})
+	c.BindJSON(&json)
+	username := json["username"].(string)
+	password := json["password"].(string)
 
-	// 解析 body json 数据到实体类
-	if err := c.ShouldBindJSON(&mAuth); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": http.StatusInternalServerError,
-			"msg":  err,
-		})
-		return
-	}
-	db := sqlInit()
-	tmp_user := UserTable{}
-	db.Table("Users").Where("username = ?", mAuth.UserName).First(&tmp_user)
-
-	// 判断是否存在
-	if tmp_user.PwdHash != "" {
+	tmp_user := User{}
+	err := db.Table("Users").Where("username = ?", username).First(&tmp_user).Error
+	if err == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code": http.StatusInternalServerError,
 			"msg":  "User Registered",
 		})
 		return
 	}
+	// V1 基于时间
+	// u1, err := uuid.NewUUID()
+	// V4 基于随机数
+	salt := uuid.New()
 
-	pwdhash, err := AesEncrypt([]byte(mAuth.PassWord))
+	sha256 := sha256.New()
+	sha256.Write([]byte(password))
+	sha256.Write([]byte(salt.String()))
+	pwdhash := hex.EncodeToString(sha256.Sum(nil))
+
+	tmp_user.Username = username
+	tmp_user.PwdHash = pwdhash + "$" + salt.String()
+	err = InsertUserInfo(db, &tmp_user)
 	if err != nil {
-		fmt.Print(err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code": http.StatusInternalServerError,
-			"msg":  err,
+			"msg":  "Registry fail!",
+		})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"code": http.StatusOK,
+			"msg":  "Registry Success!",
 		})
 	}
-
-	user_info := UserTable{
-		Username: mAuth.UserName,
-		PwdHash:  hex.EncodeToString(pwdhash),
-	}
-	// 注册
-	InsertUserInfo(db, &user_info)
-
-	// 注册成功之后 make token
-	token, err := GenerateToken(mAuth.UserName)
-	if err != nil {
-		fmt.Print(err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": http.StatusInternalServerError,
-			"msg":  err,
-		})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"code": http.StatusOK,
-		"msg":  "Registry Success!",
-		"data": token,
-	})
 }
 
 func Login(c *gin.Context) {
-	var mAuth auth
-	if err := c.ShouldBindJSON(&mAuth); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": http.StatusInternalServerError,
-			"msg":  err,
-		})
-		return
-	}
+	json := make(map[string]interface{})
+	c.BindJSON(&json)
+	username := json["username"].(string)
+	password := json["password"].(string)
+	tmp_user := User{}
 
-	db := sqlInit()
-	tmp_user := UserTable{}
-	if db == nil {
-		fmt.Println("db nil")
-		return
-	}
-	db.Table("Users").Where("username = ?", mAuth.UserName).First(&tmp_user)
-
-	// 判断是否存在
-	if tmp_user.PwdHash == "" {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": http.StatusInternalServerError,
-			"msg":  "User not Registered!",
-		})
-		return
-	}
-	pwd, _ := hex.DecodeString(tmp_user.PwdHash)
-	pwd, err := AesDecrypt(pwd)
+	err := db.Table("Users").Where("username = ?", username).First(&tmp_user).Error
 	if err != nil {
-		fmt.Print(err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": http.StatusInternalServerError,
-			"msg":  err,
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "Not Registry!",
 		})
-		return
-	}
+	} else {
+		var stored_pass []string
+		stored_pass = strings.Split(tmp_user.PwdHash, "$")
 
-	// 登录失败
-	if string(pwd) != mAuth.PassWord {
-		fmt.Printf("Login Error:%s %s", string(pwd), mAuth.PassWord)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": http.StatusInternalServerError,
-			"msg":  "PassWord Error!",
-		})
-		return
+		sha256 := sha256.New()
+		sha256.Write([]byte(password))
+		sha256.Write([]byte(stored_pass[1]))
+		pwdhash := hex.EncodeToString(sha256.Sum(nil))
+		if strings.Compare(pwdhash, stored_pass[0]) != 0 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"code": http.StatusBadRequest,
+				"msg":  "PassWord Error!",
+			})
+			return
+		} else {
+			token, _ := GenerateJwtToken(tmp_user.Uid, tmp_user.Username)
+			c.JSON(http.StatusOK, gin.H{
+				"code": http.StatusOK,
+				"msg":  "Login Success!",
+				"data": token,
+			})
+		}
 	}
-
-	// 生成token
-	token, merr := GenerateToken(tmp_user.Username)
-	if merr != nil {
-		fmt.Print(err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": http.StatusInternalServerError,
-			"msg":  "GenerateToken Error!",
-		})
-		return
-	}
-
-	// TokenList.PushBack(token) // 将生成的token存入TokenList中
-	db.Table("Users").Where("username = ?", mAuth.UserName).Update("token", token)
-	c.JSON(http.StatusOK, gin.H{
-		"code": http.StatusOK,
-		"msg":  "Login Success!",
-		"data": token,
-	})
 }
 
 func TokenAuthMiddleware(c *gin.Context) {
+	tokenString := c.Request.Header.Get("token")
+	// fmt.Println(token)
+	if tokenString != "" {
+		claims := Claims{}
+		_, err := jwt.ParseWithClaims(tokenString, &claims, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return []byte(jwtSecret), nil
+		})
 
-	tmp_user := UserTable{}
-	fmt.Println("TokenAuthMiddleware")
-
-	token := c.Request.Header.Get("token") // 查找请求中是否有token
-	fmt.Println(token)
-	if token != "" {
-		// for i := TokenList.Front(); i != nil; i = i.Next() {
-		// 	if i.Value == token {
-		// 		fmt.Println("Token Auth Success!")
-		// 		c.Next()
-		// 		return
-		// 	}
-		// }
-
-		// 查询是否有用户的token是这个
-		db.Table("Users").Where("token = ?", token).First(&tmp_user)
-		if tmp_user.Token != "" {
-			c.Next()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code": 401,
+				"msg":  "Token Auth Failed!",
+			})
 			return
 		}
+		c.Set("uid", claims.Uid)
+		c.Next()
+		return
 	}
 
 	c.JSON(http.StatusInternalServerError, gin.H{
 		"code": 401,
 		"msg":  "Token Auth Failed!",
 	})
-	// Pass on to the next-in-chain
 	c.Abort()
 }
 
@@ -389,7 +347,6 @@ func TokenAuthMiddleware(c *gin.Context) {
 // 	name := c.Query("name")
 // 	pages, _ := strconv.Atoi(c.Query("pages"))
 // 	limits, _ := strconv.Atoi(c.Query("limits"))
-// 	db := sqlInit()
 
 // 	if !db.HasTable("goods") {
 // 		db.Table("goods").CreateTable(&goods{})
@@ -416,7 +373,6 @@ func TokenAuthMiddleware(c *gin.Context) {
 // data to paint chart
 func chart_page(c *gin.Context) {
 	// /data-api/v3/cryptocurrency/chart_page
-	db := sqlInit()
 
 	coinName := c.Query("coinName")
 	pages, _ := strconv.Atoi(c.Query("pages"))
@@ -448,11 +404,39 @@ func chart_page(c *gin.Context) {
 	}
 }
 
+func historical_page_num(c *gin.Context) {
+	coinName := c.Query("coinName")
+	if !db.HasTable("history-" + coinName) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "No query coin!",
+		})
+		return
+	}
+	var count int
+	db.Table("history-" + coinName).Count(&count)
+	if count == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "No data now!",
+		})
+		return
+	} else {
+		b, err := json.Marshal(count)
+		if err != nil {
+			fmt.Println("query result convert to json error!")
+			return
+		} else {
+			c.Writer.Write(b)
+			return
+		}
+	}
+}
+
 // historical data
 func historical_page(c *gin.Context) {
-	db := sqlInit()
 	coinName := c.Query("coinName")
-	pages, _ := strconv.Atoi(c.Query("pages"))
+	pages, _ := strconv.Atoi(c.Query("pages")) // pages=1&limits=1000
 	limits, _ := strconv.Atoi(c.Query("limits"))
 	if !db.HasTable("history-" + coinName) {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -472,7 +456,10 @@ func historical_page(c *gin.Context) {
 	} else {
 		b, err := json.Marshal(his)
 		if err != nil {
-			fmt.Println("query result convert to json error!")
+			c.JSON(http.StatusBadRequest, gin.H{
+				"code": http.StatusBadRequest,
+				"msg":  "query result convert to json error!",
+			})
 			return
 		} else {
 			c.Writer.Write(b)
@@ -483,30 +470,24 @@ func historical_page(c *gin.Context) {
 
 // 获取用户收藏
 func like_get(c *gin.Context) {
-	db := sqlInit()
-	// 根据token获取用户名
-	token := c.Request.Header.Get("token")
-	tmp_user := UserTable{}
-	db.Table("Users").Where("token = ?", token).First(&tmp_user)
-	username := tmp_user.Username
-
-	// 查找用户所有收藏的币
-	var coinlike []CoinLike
-	db.Table("CoinLikes").Where("username = ?", username).Find(&coinlike)
-	if len(coinlike) == 0 {
+	uid, _ := c.Get("uid")
+	var tmp string
+	var coinlike []string
+	rows, _ := db.Raw("select name from userlike where uid = ?", uid).Rows()
+	for rows.Next() {
+		rows.Scan(&tmp)
+		coinlike = append(coinlike, tmp)
+	}
+	b, err := json.Marshal(coinlike)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code": http.StatusBadRequest,
-			"msg":  "No data now!",
+			"msg":  "query result convert to json error!",
 		})
 		return
 	} else {
-		b, err := json.Marshal(coinlike)
-		if err != nil {
-			fmt.Println("query result convert to json error!")
-		} else {
-			c.Writer.Write(b)
-			return
-		}
+		c.Writer.Write(b)
+		return
 	}
 }
 
@@ -517,23 +498,19 @@ func like_add(c *gin.Context) {
 		db.Table("CoinLikes").CreateTable(&CoinLike{})
 	}
 
-	token := c.Request.Header.Get("token")
-	tmp_user := UserTable{}
-	db.Table("Users").Where("token = ?", token).First(&tmp_user)
-	username := tmp_user.Username
-
+	uid, _ := c.Get("uid")
+	cid, _ := strconv.Atoi(c.PostForm("cid"))
 	coinlike := CoinLike{
-		Username: username,
-		Coinname: c.PostForm("coinName"),
+		Uid: uid.(int),
+		Cid: cid,
 	}
 	if err := db.Table("CoinLikes").Create(coinlike).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code": http.StatusBadRequest,
 			"msg":  "like already exists!",
 		})
+		return
 	}
-
-	// fmt.Println(coinlike, "insert success!")
 
 	c.JSON(http.StatusOK, gin.H{
 		"code": http.StatusOK,
@@ -543,21 +520,521 @@ func like_add(c *gin.Context) {
 
 // 删除收藏
 func like_del(c *gin.Context) {
-	coinName := c.Query("coinName")
-	token := c.Request.Header.Get("token")
-	tmp_user := UserTable{}
-	db.Table("Users").Where("token = ?", token).First(&tmp_user)
-	if coinName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code": http.StatusBadRequest,
-			"msg":  "no coinname!",
-		})
-		return
-	}
-	fmt.Println(token, coinName)
-	db.Table("CoinLikes").Where("username = ? and coinname = ?", tmp_user.Username, coinName).Delete(&CoinLike{})
+	cid := c.Query("cid")
+	uid, _ := c.Get("uid")
+	db.Table("CoinLikes").Where("uid = ? and cid = ?", uid, cid).Delete(&CoinLike{})
 	c.JSON(http.StatusOK, gin.H{
 		"code": http.StatusOK,
 		"msg":  "delete like success!",
 	})
+}
+
+// 添加虚拟货币
+/*
+	{
+		"name" :,
+		"id":
+	}
+*/
+func addcoin(c *gin.Context) {
+	jsonbody := make(map[string]interface{})
+	c.BindJSON(&jsonbody)
+	name := jsonbody["name"].(string)
+	id := jsonbody["id"].(int)
+	newcoin := Coin{Name: name, Id: id}
+
+	var numm float64
+	err := db.Table("coins").Create(&newcoin).Error
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "fail",
+		})
+		return
+	} else {
+		b, _ := json.Marshal(numm)
+		c.Writer.Write(b)
+		return
+	}
+}
+
+// 指定时间段内指定货币的价值比
+func rate(c *gin.Context) {
+	jsonbody := make(map[string]interface{})
+	c.BindJSON(&jsonbody)
+	st := time.Unix(int64(jsonbody["st"].(float64)), 0).Format("2006-01-02")
+	et := time.Unix(int64(jsonbody["et"].(float64)), 0).Format("2006-01-02")
+	cid := int(jsonbody["cid"].(float64))
+
+	var numm float64
+	rows, err := db.Raw("call db1.rate(?,?,?)", st, et, cid).Rows()
+	for rows.Next() {
+		rows.Scan(&numm)
+	}
+	if err != nil {
+		fmt.Println("wrong")
+		return
+	} else {
+		b, _ := json.Marshal(numm)
+		c.Writer.Write(b)
+		return
+	}
+}
+
+// 指定时间段内指定货币平均开盘价格
+func periodavgopen(c *gin.Context) {
+	jsonbody := make(map[string]interface{})
+	c.BindJSON(&jsonbody)
+	st := time.Unix(int64(jsonbody["st"].(float64)), 0).Format("2006-01-02")
+	et := time.Unix(int64(jsonbody["et"].(float64)), 0).Format("2006-01-02")
+	cid := int(jsonbody["cid"].(float64))
+
+	var numm float64
+	rows, err := db.Raw("call db1.periodavgopen(?,?,?)", st, et, cid).Rows()
+	for rows.Next() {
+		rows.Scan(&numm)
+	}
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "wrong!",
+		})
+		return
+	} else {
+		b, _ := json.Marshal(numm)
+		c.Writer.Write(b)
+		return
+	}
+}
+
+// 虚拟从银行随意获取货币
+func getmoney(c *gin.Context) {
+	// 修改account表在对应用户cid=-1(人民币) 为对应数值
+	json := make(map[string]interface{})
+	c.BindJSON(&json)
+	num := json["num"].(float64)
+	uid, _ := c.Get("uid")
+	cid := int(json["cid"].(float64))
+
+	db.AutoMigrate(&Account{})
+	ac := Account{}
+	acc := Account{uid.(int), cid, num}
+	fmt.Println(acc)
+	err := db.Table("Accounts").Where("Uid = ? and Cid = ?", uid, cid).First(&ac).Error
+	if err != nil {
+		db.Table("Accounts").Create(&acc)
+	} else {
+		acc.Cnum = ac.Cnum + num
+		db.Table("Accounts").Where("Uid = ? and Cid = ?", uid, cid).Update(acc)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code": http.StatusOK,
+		"msg":  "get success!",
+	})
+}
+
+// 返回当前账户的货币
+func account(c *gin.Context) {
+	uid, _ := c.Get("uid")
+
+	var results []MyAccount
+	db.Raw("select name as coin_name,cnum from coins,accounts where coins.id = accounts.cid and accounts.uid = ?", uid.(int)).Scan(&results)
+
+	b, err := json.Marshal(results)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "query result convert to json error!",
+		})
+		return
+	} else {
+		c.Writer.Write(b)
+		return
+	}
+
+}
+
+// 利用存储过程和游标计算当前用户账户的金额
+func myaccount(c *gin.Context) {
+	uid, _ := c.Get("uid")
+
+	var numm float64
+	var numm2 float64
+	rows, err := db.Raw("call db1.accountsum(?)", uid.(int)).Rows()
+	for rows.Next() {
+		rows.Scan(&numm, &numm2)
+	}
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "wrong",
+		})
+		return
+	} else {
+		b, _ := json.Marshal([]float64{numm, numm2})
+		c.Writer.Write(b)
+		return
+	}
+}
+
+// 创建交易
+/*
+	{
+		"TsCreateTime" : ,
+		"ExpectedTime" : ,
+		"TsCid" : ,
+		"TsNum" : ,
+	}
+*/
+func create_transaction(c *gin.Context) {
+	db.AutoMigrate(&Transaction{})
+	ts := Transaction{}
+	uid, _ := c.Get("uid")
+
+	json := make(map[string]interface{})
+	c.BindJSON(&json)
+	ExpectedTime := int64(json["ExpectedTime"].(float64))
+	TsCid := int(json["TsCid"].(float64))
+	TsNum := json["TsNum"].(float64)
+
+	ts.TsStatus = 0
+	ts.SellerId = uid.(int)
+	ts.TsCreateTime = time.Now().Unix()
+	ts.ExpectedTime = ExpectedTime
+	ts.TsCid = TsCid
+	ts.TsNum = TsNum
+
+	err := db.Table("Transactions").Create(&ts).Error
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "create transaction error!",
+		})
+		return
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"code": http.StatusOK,
+			"msg":  "create transaction Success!",
+		})
+		return
+	}
+}
+
+// 更新交易
+/*
+	{
+		"TsId" : ,
+		"TsCreateTime" : ,
+		"ExpectedTime" : ,
+		"TsCid" : ,
+		"TsNum" : ,
+	}
+*/
+func update_transaction(c *gin.Context) {
+	db.AutoMigrate(&Transaction{})
+	ts := Transaction{}
+	uid, _ := c.Get("uid")
+
+	json := make(map[string]interface{})
+	c.BindJSON(&json)
+	TsId := int(json["TsId"].(float64))
+	TsCreateTime := int64(json["TsCreateTime"].(float64))
+	ExpectedTime := int64(json["ExpectedTime"].(float64))
+	TsCid := int(json["TsCid"].(float64))
+	TsNum := json["TsNum"].(float64)
+
+	ts.TsId = TsId
+	ts.TsStatus = 0
+	ts.SellerId = uid.(int)
+	ts.TsCreateTime = TsCreateTime
+	ts.ExpectedTime = ExpectedTime
+	ts.TsCid = TsCid
+	ts.TsNum = TsNum
+
+	err := db.Table("Transactions").Update(&ts).Error
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "update transaction error!",
+		})
+		return
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"code": http.StatusOK,
+			"msg":  "update transaction Success!",
+		})
+		return
+	}
+}
+
+func timeout_transaction(c *gin.Context) {
+	db.AutoMigrate(&Transaction{})
+	tss := []Transaction{}
+	uid, _ := c.Get("uid")
+	db.Table("Transactions").Where("seller_id = ? and expected_time < ?", uid, time.Now().Unix()).Find(&tss)
+	// 插入消息
+	msg := Msg{}
+	for i, _ := range tss {
+		msg.Uid = uid.(int)
+		msg.MsgType = 1
+		msg.TsId = tss[i].TsId
+		db.Table("msgs").Create(&msg)
+	}
+}
+
+// 交易搜索 default -1 for all
+func search_transaction(c *gin.Context) {
+	// uid, _ := c.Get("uid")
+	db.AutoMigrate(&Transaction{})
+	jsonbody := make(map[string]interface{})
+	c.BindJSON(&jsonbody)
+	cid := int(jsonbody["cid"].(float64))
+
+	tss := []Transaction{}
+	if cid == -1 {
+		db.Table("transactions").Where("ts_status = 0").Scan(&tss)
+	} else {
+		db.Table("transactions").Where("ts_status = 0 and ts_cid = ?", cid).Scan(&tss)
+	}
+	for i, _ := range tss {
+		var numm float64
+		rows, _ := db.Raw("call db1.coincny(?)", tss[i].TsCid).Rows()
+		for rows.Next() {
+			rows.Scan(&numm)
+		}
+		tss[i].Cost = numm * tss[i].TsNum * tss[i].Discount
+	}
+	b, _ := json.Marshal(tss)
+	c.Writer.Write(b)
+	return
+}
+
+func onetransaction(c *gin.Context) {
+	db.AutoMigrate(&Transaction{})
+	jsonbody := make(map[string]interface{})
+	c.BindJSON(&jsonbody)
+	TsId := int(jsonbody["TsId"].(float64))
+
+	ts := Transaction{}
+	if err := db.Table("transactions").Where("ts_id = ?", TsId).Scan(&ts).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "no such transaction!",
+		})
+		return
+	}
+	var numm float64
+	rows, _ := db.Raw("call db1.coincny(?)", ts.TsCid).Rows()
+	for rows.Next() {
+		rows.Scan(&numm)
+	}
+	ts.Cost = numm * ts.TsNum * ts.Discount
+	b, _ := json.Marshal(ts)
+	c.Writer.Write(b)
+	return
+}
+
+func msg(c *gin.Context) {
+	uid, _ := c.Get("uid")
+	msgs := []Msg{}
+
+	db.Table("msgs").Where("uid = ?", uid).Find(&msgs)
+
+	b, _ := json.Marshal(msgs)
+	c.Writer.Write(b)
+	return
+}
+
+func readmsg(c *gin.Context) {
+	var msgs []int
+	c.ShouldBind(&msgs)
+	for _, msg := range msgs {
+		db.Table("msgs").Where("msg_id = ?", msg).Delete(&Msg{})
+	}
+}
+
+func close_transaction(c *gin.Context) {
+	db.AutoMigrate(&Transaction{})
+	uid, _ := c.Get("uid")
+	json := make(map[string]interface{})
+	c.BindJSON(&json)
+	TsId := int(json["TsId"].(float64))
+
+	// 更新状态和关闭时间
+	// err := db.Raw("update transactions set ts_status = 2,ts_close_time = ? where seller_id = ? and ts_id = ?", time.Now().Unix(), uid, TsId).Error
+	// err := db.Raw("update transactions set ts_status = 2 ,ts_close_time = 123456 where seller_id = 4 and ts_id = 9").Error
+	err := db.Table("transactions").Where("seller_id = ? and ts_id = ?", uid, TsId).Updates(map[string]interface{}{"ts_status": 2, "ts_close_time": time.Now().Unix()}).Error
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code": http.StatusNotFound,
+			"msg":  "update error!",
+		})
+		return
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"code": http.StatusOK,
+			"msg":  "update success!",
+		})
+		return
+	}
+}
+
+// 我卖的(订单)
+func mysell_transaction(c *gin.Context) {
+	db.AutoMigrate(&Transaction{})
+	uid, _ := c.Get("uid")
+
+	tss := []Transaction{}
+	db.Table("transactions").Where("seller_id = ?", uid).Scan(&tss)
+	for i, _ := range tss {
+		var numm float64
+		rows, _ := db.Raw("call db1.coincny(?)", tss[i].TsCid).Rows()
+		for rows.Next() {
+			rows.Scan(&numm)
+		}
+		tss[i].Cost = numm * tss[i].TsNum * tss[i].Discount
+	}
+	b, _ := json.Marshal(tss)
+	c.Writer.Write(b)
+	return
+}
+
+// 打折
+func discount(c *gin.Context) {
+	db.AutoMigrate(&Transaction{})
+	uid, _ := c.Get("uid")
+
+	json := make(map[string]interface{})
+	c.BindJSON(&json)
+	TsId := int(json["TsId"].(float64))
+	discount := json["discount"].(float64)
+
+	if err := db.Table("transactions").Where("seller_id = ? and ts_id = ?", uid, TsId).Update(map[string]interface{}{"discount": discount}).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  "fail!",
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"code": http.StatusOK,
+		"msg":  "success!",
+	})
+}
+
+// 我买的(订单)
+func mybuy_transaction(c *gin.Context) {
+	db.AutoMigrate(&Transaction{})
+	uid, _ := c.Get("uid")
+
+	tss := []Transaction{}
+	db.Table("transactions").Where("buyer_id = ?", uid).Scan(&tss)
+	for i, _ := range tss {
+		var numm float64
+		rows, _ := db.Raw("call db1.coincny(?)", tss[i].TsCid).Rows()
+		for rows.Next() {
+			rows.Scan(&numm)
+		}
+		tss[i].Cost = numm * tss[i].TsNum * tss[i].Discount
+	}
+	b, _ := json.Marshal(tss)
+	c.Writer.Write(b)
+	return
+}
+
+// 购买
+/*
+	{
+		"TsId": ""
+	}
+*/
+func buy(c *gin.Context) {
+	db.AutoMigrate(&Transaction{})
+	ts := Transaction{}
+	sac := Account{}
+	bac := Account{}
+	svac := Account{}
+	bvac := Account{}
+	uid, _ := c.Get("uid")
+	json := make(map[string]interface{})
+	c.BindJSON(&json)
+	TsId := int(json["TsId"].(float64))
+
+	err1 := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Table("transactions").Where("ts_id = ?", TsId).Scan(&ts).Error; err != nil {
+			return err
+		}
+		ts.TsStatus = 3
+		ts.BuyerId = uid.(int)
+		ts.TsCloseTime = time.Now().Unix()
+		// 获取币种最新汇率
+		var numm float64
+		rows, _ := db.Raw("call db1.coincny(?)", ts.TsCid).Rows()
+		for rows.Next() {
+			rows.Scan(&numm)
+		}
+		offset := numm * ts.TsNum * ts.Discount
+		// 人民币账户
+		if err := tx.Table("accounts").Where("uid = ? and cid = -1", ts.SellerId).Scan(&sac).Error; err != nil {
+			return err
+		}
+		if err := tx.Table("accounts").Where("uid = ? and cid = -1", ts.BuyerId).Scan(&bac).Error; err != nil {
+			return errors.New("no cny in your account")
+		}
+		// 虚拟货币账户
+		if err := tx.Table("accounts").Where("uid = ? and cid = ?", ts.SellerId, ts.TsCid).Scan(&svac).Error; err != nil {
+			svac.Cnum = 0
+		}
+		if err := tx.Table("accounts").Where("uid = ? and cid = ?", ts.BuyerId, ts.TsCid).Scan(&bvac).Error; err != nil {
+			bvac.Cnum = 0
+			tx.Table("accounts").Create(Account{uid.(int), ts.TsCid, 0})
+		}
+		if bac.Cnum-offset < 0 || svac.Cnum-ts.TsNum < 0 {
+			return errors.New("Insufficient account balance")
+		} else {
+			sac.Cnum = sac.Cnum + offset
+			bac.Cnum = bac.Cnum - offset
+			svac.Cnum = svac.Cnum - ts.TsNum
+			bvac.Cnum = bvac.Cnum + ts.TsNum
+		}
+		if err := tx.Table("accounts").Where("uid = ? and cid = -1", ts.SellerId).Update(&sac).Error; err != nil {
+			return err
+		}
+		if err := tx.Table("accounts").Where("uid = ? and cid = -1", ts.BuyerId).Update(&bac).Error; err != nil {
+			return err
+		}
+		if err := tx.Table("accounts").Where("uid = ? and cid = ?", ts.SellerId, ts.TsCid).Update("cnum", svac.Cnum).Error; err != nil {
+			return err
+		}
+		if err := tx.Table("accounts").Where("uid = ? and cid = ?", ts.BuyerId, ts.TsCid).Update("cnum", bvac.Cnum).Error; err != nil {
+			return err
+		}
+		if err := tx.Table("transactions").Where("ts_id = ?", ts.TsId).Update(&ts).Error; err != nil {
+			return err
+		}
+		// 创建消息 通知卖家
+		msg := Msg{}
+		msg.Uid = ts.SellerId
+		msg.MsgType = 2
+		msg.TsId = ts.TsId
+		if err := tx.Table("msgs").Create(&msg).Error; err != nil {
+			return err
+		}
+		// 返回 nil 提交事务
+		return nil
+	})
+	if err1 != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code": http.StatusBadRequest,
+			"msg":  err1.Error(),
+		})
+		return
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"code": http.StatusOK,
+			"msg":  "success!",
+		})
+		return
+	}
 }
