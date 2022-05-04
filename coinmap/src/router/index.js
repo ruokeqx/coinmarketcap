@@ -8,6 +8,10 @@ const CryptocurrencyDetail = () => import('../components/CryptocurrencyDetail.vu
 const Asset = () => import('../components/Asset')
 const Login = () => import('../components/Login')
 const Collection = () => import('../components/Collection')
+const Trade = () => import('../components/Trade')
+const SaleCoin = () => import('../components/SaleCoin')
+const MyTrading = () => import('../components/MyTrading')
+const Transaction = () => import('../components/Transaction')
 
 Vue.use(VueRouter)
 const routes = [
@@ -34,16 +38,34 @@ const routes = [
       },
       {
         path: '/collection',
-        component:Collection
+        component: Collection
       },
       {
         path: '/cryptocurrency_detail',
-        component:CryptocurrencyDetail
+        component: CryptocurrencyDetail
       },
       {
         path: '/asset',
-        component:Asset
-      }
+        component: Asset
+      },
+      {
+        path: '/trade',
+        component: Trade
+      },
+      {
+        name: 'sale_coin',
+        path: '/sale_coin/:coin?',
+        component: SaleCoin
+      },
+      {
+        name: 'transaction',
+        path: '/transaction/:TsId',
+        component: Transaction,
+      },
+      {
+        path:"/my_trading",
+        component: MyTrading
+      },
 
     ]
   },

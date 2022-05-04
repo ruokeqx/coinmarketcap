@@ -89,34 +89,25 @@ export default {
   },
   methods: {
     async register() {
-      this.$refs.loginFormRef.validate(async (vaild) => {
-        if (!vaild) return;
-        const { data: res } = await this.$http.post("register", this.loginForm);
-        console.log(res);
-        if (res.code !== 200) return this.$message.error("注册失败");
-        this.$message.success("注册成功");
-        // 将登录成功后的token保存到seessionStorage中
-        window.sessionStorage.setItem("token", res.data);
-        // 通过编程式导航跳转到后台主页，路由地址是/home
-        this.$router.push("/login");
-      });
+      let vaild=await this.$refs.loginFormRef.validate();
+      if (!vaild) return;
+      const { data: res } = await this.$http.post("register", this.loginForm);
+      if (res.code !== 200) return this.$message.error("注册失败");
+      this.$message.success("注册成功");
+      await this.login();
+
     },
     async login() {
-      this.$refs.loginFormRef.validate(async (vaild) => {
-        if (!vaild) return;
-        const { data: res } = await this.$http.post("login", this.loginForm);
-        console.log(res);
-        if (res.code == 200) this.$message.success("登录成功");
-        else return this.$message.error("登录失败");
-        // 将登录成功后的token保存到seessionStorage中
-        window.sessionStorage.setItem("token", res.data);
-        // 通过编程式导航跳转到后台主页，路由地址是/home
-        this.$router.push({
-          path: "/cryptocurrency",
-          query: {
-            username: this.loginForm.username,
-          },
-        });
+      let vaild=await this.$refs.loginFormRef.validate();
+      if (!vaild) return;
+      const { data: res } = await this.$http.post("login", this.loginForm);
+      if (res.code == 200) this.$message.success("登录成功");
+      else return this.$message.error("登录失败");
+      // 将登录成功后的token保存到seessionStorage中
+      window.sessionStorage.setItem("token", res.data);
+      // 通过编程式导航跳转到后台主页，路由地址是/home
+      this.$router.push({
+        path: "/cryptocurrency",
       });
     },
   },

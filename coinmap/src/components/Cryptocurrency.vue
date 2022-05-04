@@ -7,23 +7,16 @@
       :header-cell-style="{ color: '#000000' }"
       :cell-style="{ color: '#000000' }"
       :row-style="{ height: 60 + 'px' }"
+      @row-click="RowClick"
     >
-      <el-table-column prop="Index" width="50" align="center">
-      </el-table-column>
-      <el-table-column prop="Name" label="Name" align="center">
-        <template slot-scope="scope">
-          <div size="mini" id="main" @click="RowClick(scope.row.Name)">
-            {{ scope.row.Name }}
-          </div>
-        </template>
-      </el-table-column>
+      <el-table-column prop="Index" width="50" align="center"/>
+      <el-table-column prop="Name" label="Name" align="center"/>
       <el-table-column
         prop="Price"
         label="Price"
         align="center"
         style="margin-right:5%"
-      >
-      </el-table-column>
+      />
       <el-table-column prop="h24" label="24h %" align="center">
         <template slot-scope="scope">
           <span
@@ -62,6 +55,7 @@
         <template slot-scope="scope">
           <el-button
             @click="lickClick(scope.row)"
+            @click.stop
             type="primary"
             icon="el-icon-star-off"
             circle
@@ -183,37 +177,34 @@ export default {
     },
     // 分页跳转
     handleCurrentChange(val) {
-      console.log(`当前页: ${val}`);
       this.page = val;
       this.tableData = [];
       this.getData();
     },
     // 点击当前行传入要跳转模块的id
-    RowClick(name) {
-      console.log(name);
+    RowClick(row) {
       this.$router.push({
         path: "/cryptocurrency_detail",
         query: {
-          coin: name
+          coin: row.Name
         }
       });
     },
     lickClick(row) {
       var param = new FormData();
-      param.append("coinName", row.Name);
+      param.append("cid", coins.find((x)=>x.name==row.Name).id);
       var config = {
         headers: {
           token: window.sessionStorage["token"]
         }
       };
-      console.log(row.Name);
       this.$http
         .post("data-api/v3/cryptocurrency/like", param, config)
         .then(data => {
           this.$message.success("收藏成功");
         })
         .catch(e => {
-          this.$message.error("收藏失败");
+          this.$message.error("收藏失败: "+e.response.data.msg);
         });
     }
   }

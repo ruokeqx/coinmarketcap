@@ -125,7 +125,6 @@ export default {
           }
         )
         .then((res) => {
-          console.log(res.data);
           res.data.map((i) => {
             if (this.money === "$") {
               data.push([parseInt(i.Time + "000"), i.Price]);
@@ -134,7 +133,6 @@ export default {
               data.push([parseInt(i.Time + "000"), i.ZhPrice]);
             }
           });
-          console.log(data);
         });
 
       let option = {
@@ -214,7 +212,6 @@ export default {
       //   let now = new Date((base += oneDay));
       //   data.push([+now, Math.round((Math.random() - 0.5) * 20 + data[i - 1][1])]);
       // }
-      // console.log(data)
       let data = [];
       await this.$http
         .get(
@@ -230,7 +227,6 @@ export default {
           }
         )
         .then((res) => {
-          console.log(res.data);
           res.data.map((i) => {
             if (this.money === "$") {
               data.push([parseInt(i.Time + "000"), i.MarketCap]);
@@ -239,7 +235,6 @@ export default {
               data.push([parseInt(i.Time + "000"), i.ZhMarketCap]);
             }
           });
-          console.log(data);
         });
 
       let option = {
@@ -316,7 +311,6 @@ export default {
           }
         )
         .then((res) => {
-          console.log(res.data);
           res.data.map((i) => {
             if (this.money === "$") {
               data.push([
@@ -339,7 +333,6 @@ export default {
               ]);
             }
           });
-          console.log(data);
         });
 
       let option = {
@@ -488,7 +481,6 @@ export default {
       //   let now = new Date((base += oneDay));
       //   data.push([+now, Math.round((Math.random() - 0.5) * 20 + data[i - 1][1])]);
       // }
-      // console.log(data)
       let data = [];
       await this.$http
         .get(
@@ -504,7 +496,6 @@ export default {
           }
         )
         .then((res) => {
-          console.log(res.data);
           res.data.map((i) => {
             if (this.money === "$") {
               data.push([parseInt(i.Time + "000"), i.BitcoinRate]);
@@ -513,7 +504,6 @@ export default {
               data.push([parseInt(i.Time + "000"), i.BitcoinRate]);
             }
           });
-          console.log(data);
         });
 
       let option = {

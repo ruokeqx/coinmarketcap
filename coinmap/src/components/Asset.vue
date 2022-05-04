@@ -67,9 +67,11 @@
         <el-table-column prop="Cnum" label="余额" align="center" />
         <el-table-column label="操作" align="center">
           <template slot-scope="scope">
-            <el-button size="small" @click="ChargeClick(scope.row.CoinName)"
-              >充值</el-button
-            >
+            <el-button size="small" @click="ChargeClick(scope.row.CoinName)" style="margin-right: 1rem"
+              >充值</el-button>
+              <router-link :to="{ name: 'sale_coin', params: { coin: scope.row.CoinName }}">
+                <el-button size="small">出售</el-button>
+              </router-link>
           </template>
         </el-table-column>
       </el-table>
@@ -91,9 +93,8 @@ export default {
         selectedCoin: null
       },
       chargeRules: {
-        //用户名验证
         chargeAmount: [
-          { required: true,pattern: /[1-9][0-9*](\.[0-9]*)?/, message: "请输入金额",  trigger: "blur" },
+          { required: true,pattern: /[1-9][0-9]*(\.[0-9]*)?/, message: "请输入金额",  trigger: "blur" },
         ],
         selectedCoin:[
           { required: true, message: "请选择币种", trigger: "blur" },
@@ -147,7 +148,7 @@ export default {
       this.$prompt("请输入充值数量", "", {
         confirmButtonText: "确定",
         cancelButtonText: "取消",
-        inputPattern: /[1-9][0-9*](\.[0-9]*)?/,
+        inputPattern: /[1-9][0-9]*(\.[0-9]*)?/,
         inputErrorMessage: "金额错误"
       }).then(({ value }) => {
         out.$http
@@ -201,7 +202,7 @@ export default {
           .catch(function(error) {
             this.$message.error("充值失败");
           });
-    }
+    },
   }
 };
 </script>
