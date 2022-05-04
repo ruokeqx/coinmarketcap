@@ -10,12 +10,12 @@ import (
 )
 
 type Coin struct {
-	Name string `gorm:"primary_key"`
-	Id   int
+	Name string
+	Id   int `gorm:"primary_key"`
 }
 type CoinLike struct {
-	Username string `gorm:"uniqueIndex:name"`
-	Coinname string `gorm:"uniqueIndex:name"`
+	Uid int
+	Cid int
 }
 type CoinPointQuote struct {
 	Id          int
@@ -54,23 +54,49 @@ type CoinHistoricalQuote struct {
 	// timestamp string
 }
 
-type UserTable struct {
+type User struct {
+	Uid      int    `json:"uid"`
 	Username string `json:"username"`
 	PwdHash  string `json:"password"`
-	Token    string `json:"token"`
-}
-
-type auth struct {
-	// UserName 用户名
-	UserName string `json:"username" example:"zhangsan" validate:"required,gte=5,lte=30"`
-	// PassWord 密码
-	PassWord string `json:"password" example:"zhangsan" validate:"required,gte=5,lte=30"`
 }
 
 // Claims 声明
 type Claims struct {
-	LoginName []byte `json:"loginname"`
+	Uid      int    `json:"uid"`
+	Username string `json:"loginname"`
 	jwt.StandardClaims
+}
+
+type Transaction struct {
+	TsId         int     `gorm:"primary_key;AUTO_INCREMENT"` // 交易编号
+	TsStatus     int     `json:"TsStatus"`                   // 交易状态 0 created/1 timeout/2 closed
+	SellerId     int     `json:"SellerId"`                   // 卖家id
+	BuyerId      int     `json:"BuyerId"`                    // 买家id
+	TsCreateTime int64   `json:"TsCreaTime"`                 // 交易创建时间
+	ExpectedTime int64   `json:"ExpectedTime"`               // 期待交易日期
+	TsCloseTime  int64   `json:"TsCloseTime"`                // 交易关闭时间
+	TsCid        int     `json:"TsCid"`                      // 交易货币
+	Discount     float64 `gorm:"default:1;"`                 // 折扣
+	TsNum        float64 `json:"TsNum"`                      // 交易量
+	Cost         float64 `json:"Cost"`
+}
+
+type Msg struct {
+	MsgId   int `gorm:"primary_key;AUTO_INCREMENT"`
+	Uid     int
+	MsgType int // 0 discount 1 time out 2 finished
+	TsId    int
+}
+
+type Account struct {
+	Uid  int     `gorm:"primary_key"`
+	Cid  int     `gorm:"primary_key"`
+	Cnum float64 `json:"Cnum"`
+}
+
+type MyAccount struct {
+	CoinName string  `json:"CoinName"`
+	Cnum     float64 `json:"Cnum"`
 }
 
 var (
@@ -83,7 +109,8 @@ func sqlInit() *gorm.DB {
 	// db, err = gorm.Open("mysql", "ruokeqx:ruokeqx666@(121.196.208.97:3306)/ruokeqx?charset=utf8mb4&parseTime=True&loc=Local")
 	once.Do(func() {
 		var err error
-		db, err = gorm.Open("mysql", "root:root@(127.0.0.1:3306)/db1?charset=utf8mb4&parseTime=True&loc=Local")
+		db, err = gorm.Open("mysql", "root:root@(127.0.0.1:3306)/db1?charset=utf8mb4&parseTime=True&loc=Local&multiStatements=true&autocommit=true")
+		// rawdb, _ = sql.Open("mysql", "root:root@(127.0.0.1:3306)/db1?charset=utf8mb4&parseTime=True&loc=Local&multiStatements=true&autocommit=true")
 		if err != nil {
 			panic("Connect database error!")
 		}
@@ -139,12 +166,30 @@ func InsertHistory(db *gorm.DB, quote CoinHistoricalQuote) {
 	}
 }
 
-func InsertUserInfo(db *gorm.DB, user *UserTable) {
+func InsertUserInfo(db *gorm.DB, user *User) error {
 	if !db.HasTable("Users") {
-		db.Table("Users").CreateTable(&UserTable{})
+		db.Table("Users").CreateTable(&User{})
 	}
 
-	db.Table("Users").Create(user)
-	fmt.Println(user, "insert success!")
-
+	err := db.Table("Users").Create(user).Error
+	if err != nil {
+		return err
+	}
+	return nil
 }
+
+// func main() {
+// 	password := "ruokeqx"
+// 	salt := uuid.New()
+
+// 	sha256 := sha256.New()
+// 	sha256.Write([]byte(password))
+// 	fmt.Println(salt)
+// 	sha256.Write([]byte(salt.String()))
+// 	fmt.Println(hex.EncodeToString(sha256.Sum(nil)) + "$" + salt.String())
+
+// 	var salted_hash []string
+// 	salted_hash_password := "e3a3c3934225b513e03ff0a7f68a605fd8dcf63c1d8c30cde3717c26d9f58935$93d2d0b0-df17-44e3-a875-0aef60457719"
+// 	salted_hash = strings.Split(salted_hash_password, "$")
+// 	fmt.Println(salted_hash[0], salted_hash[1])
+// }
