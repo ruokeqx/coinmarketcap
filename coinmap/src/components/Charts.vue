@@ -2,10 +2,10 @@
   <div>
     <div id="flex">
         <div class="flex-item">
-          <el-button size="mini" class="but" @click="click1">Price</el-button>
-          <el-button size="mini" class="but" @click="click2">Market Cap</el-button>
-          <el-button size="mini" class="but" @click="click3">TradingView</el-button>
-          <el-button size="mini" class="but" @click="click4">BtcExchange</el-button>
+          <el-button size="mini" class="but" @click="click1">价格</el-button>
+          <el-button size="mini" class="but" @click="click2">市值</el-button>
+          <el-button size="mini" class="but" @click="click3">交易量</el-button>
+          <el-button size="mini" class="but" @click="click4">比特币兑换</el-button>
         </div>
         <div class="flex-item">
           <el-button size="mini" class="but" @click="click9">USD</el-button>

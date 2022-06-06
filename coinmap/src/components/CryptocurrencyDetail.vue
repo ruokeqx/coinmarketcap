@@ -9,13 +9,13 @@
       :row-style="{ height: 60 + 'px' }"
       @row-click="RowClick"
     >
-      <el-table-column prop="Index" width="70" align="center" />
-      <el-table-column prop="Name" label="Name" align="center"/>
+      <el-table-column prop="Index" width="50" align="center"/>
+      <el-table-column prop="Name" label="Name" align="center" min-width="130px"/>
       <el-table-column
         prop="Price"
         label="Price"
         align="center"
-        style="margin-right:5%"
+        min-width="120px"
       />
 
       <el-table-column
@@ -23,12 +23,14 @@
         label="Market Cap"
         align="center"
         :render-header="tipHelp1"
+        min-width="150px"
       />
       <el-table-column
         prop="Volume"
         label="Volume(24h)"
         align="center"
         :render-header="tipHelp2"
+        min-width="140px"
       />
     </el-table>
     <div class="block">

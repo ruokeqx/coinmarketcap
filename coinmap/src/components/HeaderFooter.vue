@@ -6,21 +6,12 @@
           <div id="head-line">
             <el-image
               :src="src"
-              style="width: 216px; height: 37px;float: left"
+              style="width: 140px; height: 25px;float: left;margin-top:5px;"
               class="img"
               @click="homeClick()"
             ></el-image>
             <div style="float: right">
-              <el-button
-                @click="homeClick()"
-                style="border: none;margin-right: 10px"
-                >主页</el-button
-              >
-              <el-button
-                @click="$router.push({ path: '/trade' })"
-                style="border: none;margin-right: 10px"
-                >交易中心</el-button
-              >
+
               <el-badge
                 :value="messages.length"
                 :hidden="messages.length == 0"
@@ -28,6 +19,7 @@
                 style="margin-right: 10px;"
               >
                 <el-popover placement="bottom" width="80" trigger="hover">
+              
                   <div v-if="messages.length == 0" style="text-align: center">
                     无消息
                   </div>
@@ -63,26 +55,31 @@
                   ></el-button>
                 </el-popover>
               </el-badge>
-              <el-popover placement="bottom" width="80" trigger="hover">
+              <el-popover placement="bottom" width="80" trigger="hover" v-model="visible">
                 <div>
                   <el-button
                     class="pop-item"
-                    @click="$router.push({ path: '/collection' })"
+                    @click="$router.push({ path: '/trade' });visible=false;"
+                    >交易中心</el-button
+                    >
+                  <el-button
+                    class="pop-item"
+                    @click="$router.push({ path: '/collection' });visible=false;"
                     >我的收藏</el-button
                   >
                   <el-button
                     class="pop-item"
-                    @click="$router.push({ path: '/my_trading' })"
+                    @click="$router.push({ path: '/my_trading' });visible=false;"
                     >个人交易</el-button
                   >
                   <el-button
                     class="pop-item"
-                    @click="$router.push({ path: '/asset' })"
+                    @click="$router.push({ path: '/asset' });visible=false;"
                     >个人资产</el-button
                   >
                   <el-button
                     class="pop-item"
-                    @click="$router.push({ path: '/sale_coin' })"
+                    @click="$router.push({ path: '/sale_coin' });visible=false;"
                     >出售货币</el-button
                   >
                   <el-button class="pop-item" @click="logoutClick()"
@@ -129,6 +126,7 @@ import COIN from "../assets/COIN.png";
 export default {
   data() {
     return {
+      visible:false,
       src: COIN,
       messages: [],
       timer: null
@@ -147,12 +145,14 @@ export default {
       this.$router.push({
         path: "/cryptocurrency"
       });
+      this.visible=false;
     },
     logoutClick() {
       window.sessionStorage.removeItem("token");
       this.$router.push({
         path: "/login"
       });
+      this.visible=false;
     },
 
     async getMessage() {

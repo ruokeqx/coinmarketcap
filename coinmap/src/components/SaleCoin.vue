@@ -12,10 +12,10 @@
         >
           <el-card shadow="hover" style="text-align: center;">
             <el-row :gutter="20">
-              <el-col :span="6" style="line-height: 48px;text-align: right;"
+              <el-col :span="7" style="line-height: 48px;text-align: right;"
                 >币种</el-col
               >
-              <el-col :span="18">
+              <el-col :span="17">
                 <el-form-item prop="selectedCoin">
                   <el-select
                     :disabled="fixed"
@@ -37,10 +37,10 @@
             </el-row>
 
             <el-row :gutter="20">
-              <el-col :span="6" style="line-height: 48px;text-align: right;"
+              <el-col :span="7" style="line-height: 48px;text-align: right;"
                 >出售数量</el-col
               >
-              <el-col :span="18">
+              <el-col :span="17">
                 <el-form-item prop="amount">
                   <el-input
                     placeholder="请输入出售数量"
@@ -51,10 +51,10 @@
               </el-col>
             </el-row>
             <el-row :gutter="20">
-              <el-col :span="6" style="line-height: 48px;text-align: right;"
-                >预期交易时间</el-col
+              <el-col :span="7" style="line-height: 48px;text-align: right;"
+                >预期时间</el-col
               >
-              <el-col :span="18">
+              <el-col :span="17">
                 <el-form-item prop="expectedTime">
                   <el-date-picker
                     v-model="form.expectedTime"
@@ -140,7 +140,7 @@ export default {
             )
             .then(res => {
               if (res.data.code == 200) {
-                oldThis.$message.success("上架成功");
+                oldThis.$message.success("出售成功");
                 oldThis.$router.push({ path: "/trade" });
               } else {
                 oldThis.$alert(res.data.msg, "提示", {

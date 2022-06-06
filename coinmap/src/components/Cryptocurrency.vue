@@ -10,12 +10,12 @@
       @row-click="RowClick"
     >
       <el-table-column prop="Index" width="50" align="center"/>
-      <el-table-column prop="Name" label="Name" align="center"/>
+      <el-table-column prop="Name" label="Name" align="center" min-width="140px"/>
       <el-table-column
         prop="Price"
         label="Price"
         align="center"
-        style="margin-right:5%"
+        min-width="120px"
       />
       <el-table-column prop="h24" label="24h %" align="center">
         <template slot-scope="scope">
@@ -41,6 +41,7 @@
         prop="MarketCap"
         label="Market Cap"
         align="center"
+        min-width="150px"
         :render-header="tipHelp1"
       >
       </el-table-column>
@@ -48,6 +49,7 @@
         prop="Volume"
         label="Volume(24h)"
         align="center"
+        min-width="140px"
         :render-header="tipHelp2"
       >
       </el-table-column>

@@ -4,4 +4,14 @@
   </div>
 </template>
 
-<style></style>
+<style>
+@media screen and (max-width: 750px) {
+  .el-message-box {
+    width: 75% !important;
+  }
+  .el-message {
+    min-width: 75% !important;
+  }
+}
+
+</style>

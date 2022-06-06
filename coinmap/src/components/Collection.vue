@@ -11,12 +11,13 @@
       //需要显示文字提示的表头列加上 :render-header="tipHelp"，tipHelp是一个方法
       <el-table-column prop="Index" width="50" align="center">
       </el-table-column>
-      <el-table-column prop="Name" label="Name" align="center"/>
+      <el-table-column prop="Name" label="Name" align="center" min-width="150px"/>
       <el-table-column
         prop="Price"
         label="Price"
         align="center"
         style="margin-right:5%"
+        min-width="150px"
       >
       </el-table-column>
       <el-table-column prop="h24" label="24h %" align="center">
@@ -44,6 +45,7 @@
         label="Market Cap"
         align="center"
         :render-header="tipHelp1"
+         min-width="170px"
       >
       </el-table-column>
       <el-table-column
@@ -51,6 +53,7 @@
         label="Volume(24h)"
         align="center"
         :render-header="tipHelp2"
+         min-width="170px"
       >
       </el-table-column>
       <el-table-column prop="Collection" label="Collection" align="center">

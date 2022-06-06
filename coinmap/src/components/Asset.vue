@@ -26,7 +26,7 @@
       label-width="0px"
     >
       <div
-        style="display: flex;gap: 10px;flex-wrap: nowrap;align-content: center;justify-content: space-around;align-items: flex-start;flex-direction: row;"
+      id="charge-line"
       >
         <el-form-item prop="selectedCoin">
           <el-select
@@ -44,14 +44,14 @@
             </el-option>
           </el-select>
         </el-form-item>
-        <el-form-item prop="chargeAmount" style="flex: 1">
-          <el-input
-            placeholder="请输入充值金额"
-            v-model="chargeForm.chargeAmount"
-          ></el-input>
-        </el-form-item>
-        <el-button @click="chargeButton()">充值</el-button>
-      </div>
+          <el-form-item prop="chargeAmount" style="flex: 1">
+            <el-input
+              placeholder="请输入充值金额"
+              v-model="chargeForm.chargeAmount"
+            ></el-input>
+          </el-form-item>
+          <el-button @click="chargeButton()">充值</el-button>
+        </div>
     </el-form>
 
     <h2 style="margin-top: 4rem">详情</h2>
@@ -63,9 +63,9 @@
         :cell-style="{ color: '#000000' }"
         :row-style="{ height: 60 + 'px' }"
       >
-        <el-table-column prop="CoinName" label="币种" align="center" />
-        <el-table-column prop="Cnum" label="余额" align="center" />
-        <el-table-column label="操作" align="center">
+        <el-table-column prop="CoinName" label="币种" align="center" min-width="150px"/>
+        <el-table-column prop="Cnum" label="余额" align="center" min-width="200px"/>
+        <el-table-column label="操作" align="center" min-width="150px">
           <template slot-scope="scope">
             <el-button size="small" @click="ChargeClick(scope.row.CoinName)" style="margin-right: 1rem"
               >充值</el-button>
@@ -171,6 +171,7 @@ export default {
       });
     },
     ChargeClick(name) {
+      if(name=="cny")return this.charge(-1);
       let id = coins.find(x => x["name"] == name)["id"];
       if (id == -1) {
         this.$message.error("币种不存在");
@@ -244,11 +245,28 @@ export default {
   margin: 20px 2%;
   width: 45%;
 }
+
+@media only screen and (min-width: 500px) {
+  #charge-line {
+    display: flex;
+    gap: 10px;
+    flex-wrap: nowrap;
+    align-content: center;
+    justify-content: space-around;
+    align-items: flex-start;
+    flex-direction: row;
+  }
+}
+@media only screen and (max-width: 700px) {
+  #charge-line {
+  }
+}
 @media only screen and (max-width: 700px) {
   .my-card {
     display: block;
     margin: 20px auto;
     width: 90%;
   }
+
 }
 </style>

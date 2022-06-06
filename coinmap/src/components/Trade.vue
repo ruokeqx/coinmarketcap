@@ -27,13 +27,13 @@
 
     <el-table
       :data="tableData"
-      style="text-algin:center; font-size: 15px"
+      style="text-algin:center; font-size: 15px; margin-top: 20px;"
       :header-cell-style="{ color: '#000000' }"
       :cell-style="{ color: '#000000' }"
       :row-style="{ height: 60 + 'px' }"
       @row-click="jump_to_transaction"
     >
-      <el-table-column label="创建日期" align="center">
+      <el-table-column label="创建日期" align="center" min-width="150px">
         <template slot-scope="scope">
           {{ dateToString(scope.row.TsCreaTime) }}
         </template>
@@ -45,7 +45,7 @@
       </el-table-column>
       <el-table-column prop="TsNum" label="交易数量" align="center" />
       <el-table-column prop="Discount" label="折扣" align="center" />
-      <el-table-column label="价格" align="center" >
+      <el-table-column label="价格" align="center" min-width="150px">
         <template slot-scope="scope">
           {{scope.row.Cost.toFixed(2) }}
         </template>
@@ -112,9 +112,9 @@ export default {
         " " +
         toTwoStr(date.getHours()) +
         ":" +
-        toTwoStr(date.getMinutes()) +
-        ":" +
-        toTwoStr(date.getSeconds())
+        toTwoStr(date.getMinutes()) // +
+        // ":" +
+        // toTwoStr(date.getSeconds())
       );
     },
     buyClick(TsId) {

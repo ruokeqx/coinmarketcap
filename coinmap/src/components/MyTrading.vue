@@ -17,7 +17,7 @@
       :row-style="{ height: 60 + 'px' }"
       @row-click="jump_to_transaction"
     >
-      <el-table-column :label="menuSelected==1?'创建日期':'购买日期'" align="center">
+      <el-table-column :label="menuSelected==1?'创建日期':'购买日期'" align="center" min-width="150px">
         <template slot-scope="scope">
           {{ dateToString(scope.row.TsCreaTime) }}
         </template>
@@ -29,12 +29,12 @@
       </el-table-column>
       <el-table-column prop="TsNum" label="交易数量" align="center" />
       <el-table-column prop="Discount" label="折扣" align="center" />
-      <el-table-column label="价格" align="center" >
+      <el-table-column label="价格" align="center" min-width="200px">
         <template slot-scope="scope">
           {{scope.row.Cost.toFixed(2) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" v-if="menuSelected==1">
+      <el-table-column label="操作" align="center" v-if="menuSelected==1" min-width="150px">
         <template slot-scope="scope">
           <el-button v-if="scope.row.TsStatus==0" @click="takeDown(scope.row.TsId)" type="small" style="margin-right: 5px" @click.stop
             >下架</el-button
@@ -115,9 +115,9 @@ export default {
         " " +
         toTwoStr(date.getHours()) +
         ":" +
-        toTwoStr(date.getMinutes()) +
-        ":" +
-        toTwoStr(date.getSeconds())
+        toTwoStr(date.getMinutes()) // +
+        // ":" +
+        // toTwoStr(date.getSeconds())
       );
     },
     takeDown(TsId) {
@@ -153,7 +153,7 @@ export default {
         .catch(() => {
           oldThis.$message({
             type: "info",
-            message: "取消购买"
+            message: "取消下架"
           });
         });
     },

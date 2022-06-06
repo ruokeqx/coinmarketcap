@@ -17,7 +17,7 @@
             v-else
             class="margin-top"
             title="详情"
-            :column="2"
+            :column="1"
             border
           >
             <template slot="extra">
@@ -231,7 +231,7 @@ export default {
         .catch(() => {
           oldThis.$message({
             type: "info",
-            message: "取消购买"
+            message: "取消下架"
           });
         });
     },
@@ -285,7 +285,7 @@ export default {
         " " +
         toTwoStr(date.getHours()) +
         ":" +
-        toTwoStr(date.getMinutes()) +
+        toTwoStr(date.getMinutes())  +
         ":" +
         toTwoStr(date.getSeconds())
       );
