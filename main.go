@@ -18,25 +18,16 @@ import (
 )
 
 var TokenList = list.New()
-var jwtSecret = []byte("JwtSecret")
+var jwtSecret = []byte("a7391f86-cad7-11ec-8111-4889e7b4031a")
 
-// GenerateToken 生成 token
-func GenerateToken(loginName string) (string, error) {
-	var err error
-	aesLoginName, err := AesEncrypt([]byte(loginName))
-	if err != nil {
-		return "", err
-	}
-
-	// 现在的时间
-	nowTime := time.Now()
-	// 过期的时间
-	expireTime := nowTime.Add(3 * time.Hour)
-	// 初始化 声明
+func GenerateJwtToken(Uid int, loginName string) (string, error) {
+	expireTime := time.Now().Add(24 * time.Hour)
 	claims := Claims{
-		aesLoginName, jwt.StandardClaims{
+		Uid,
+		loginName,
+		jwt.StandardClaims{
 			ExpiresAt: expireTime.Unix(),
-			Issuer:    "aims",
+			Issuer:    "ruokeqx",
 		},
 	}
 	tokenClaims := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -140,6 +131,7 @@ func main() {
 	// dspider
 	// mqwithcron(coins)
 
+	sqlInit()
 	// gin server
 	router := gin.Default()
 
@@ -291,7 +283,14 @@ func main() {
 			}
 	*/
 	router.GET("/data-api/v3/cryptocurrency/chart_page", TokenAuthMiddleware, chart_page)
-
+	/*
+		historical_page api
+		post data
+			{
+				"coinName":,
+			}
+	*/
+	router.GET("/data-api/v3/cryptocurrency/historical_page_num", TokenAuthMiddleware, historical_page_num)
 	/*
 		historical_page api
 		post data
@@ -306,19 +305,123 @@ func main() {
 	/*
 		like_get api	get with token
 		like_add
-			post data
-				{
-					"coinName":,
-				}
+			formdata cid
 		like_del
-			post data
-				{
-					"coinName":,
-				}
+			query cid
 	*/
 	router.GET("/data-api/v3/cryptocurrency/like", TokenAuthMiddleware, like_get)
 	router.POST("/data-api/v3/cryptocurrency/like", TokenAuthMiddleware, like_add)
 	router.DELETE("/data-api/v3/cryptocurrency/like", TokenAuthMiddleware, like_del)
+
+	// 添加虚拟货币
+	/*
+		{
+			"name" :,
+			"id":
+		}
+	*/
+	// TODO addcoin √
+	router.POST("/data-api/v3/cryptocurrency/addcoin", TokenAuthMiddleware, addcoin)
+
+	// 指定时间段变化率(函数)rate(begintime,endtime)
+	// TODO rate √
+	router.GET("/data-api/v3/cryptocurrency/rate", TokenAuthMiddleware, rate)
+	// 指定时间段变化率(存储过程) periodavgopen(bt,et,avgopen)
+	// TODO periodavgopen √
+	router.GET("/data-api/v3/cryptocurrency/periodavgopen", TokenAuthMiddleware, periodavgopen)
+
+	// 虚拟从银行随意获取货币
+	/*
+		{
+			"cid":,
+			"num":
+		}
+	*/
+	router.POST("/data-api/v3/cryptocurrency/getmoney", TokenAuthMiddleware, getmoney)
+
+	// 存储过程 获取当前货币总账户换算人民币/美元
+	// TODO account √
+	router.GET("/data-api/v3/cryptocurrency/account", TokenAuthMiddleware, account)
+	// 存储过程 获取当前货币总账户换算人民币/美元
+	// TODO myaccount √
+	router.GET("/data-api/v3/cryptocurrency/myaccount", TokenAuthMiddleware, myaccount)
+
+	// 创建交易
+	/*
+		{
+			"TsCreateTime" : ,
+			"ExpectedTime" : ,
+			"TsCid" : ,
+			"TsNum" : ,
+		}
+	*/
+	// TODO create_transaction √
+	router.POST("/data-api/v3/cryptocurrency/transaction/create", TokenAuthMiddleware, create_transaction)
+	// 超时提醒(存储过程) //定时请求
+	// TODO timeout_transaction √
+	router.GET("/data-api/v3/cryptocurrency/transaction/timeout", TokenAuthMiddleware, timeout_transaction)
+	// 更新交易(事务)
+	/*
+		{
+			"TsId" : ,
+			"TsCreateTime" : ,
+			"ExpectedTime" : ,
+			"TsCid" : ,
+			"TsNum" : ,
+		}
+	*/
+	// TODO update_transaction √
+	router.POST("/data-api/v3/cryptocurrency/transaction/update", TokenAuthMiddleware, update_transaction)
+	// 搜索交易
+	/*
+		{
+			"cid":
+		}
+	*/
+	// TODO search_transaction √
+	router.POST("/data-api/v3/cryptocurrency/transaction/search", TokenAuthMiddleware, search_transaction)
+	// TODO onetransaction √
+	router.POST("/data-api/v3/cryptocurrency/transaction/onetransaction", TokenAuthMiddleware, onetransaction)
+	// 消息通知
+	// TODO msg √
+	router.GET("/data-api/v3/cryptocurrency/transaction/msg", TokenAuthMiddleware, msg)
+	// 关闭消息
+	// TODO readmsg
+	router.POST("/data-api/v3/cryptocurrency/transaction/readmsg", TokenAuthMiddleware, readmsg)
+	// 关闭交易(主动关闭)(事务)
+	/*
+		{
+			"TsId":""
+		}
+	*/
+	// TODO close_transaction √
+	router.POST("/data-api/v3/cryptocurrency/transaction/close", TokenAuthMiddleware, close_transaction)
+	// 我卖的(订单)
+	// TODO mysell_transaction √
+	router.GET("/data-api/v3/cryptocurrency/transaction/mysell", TokenAuthMiddleware, mysell_transaction)
+	// TODO discount
+	/*
+		{
+			"TsId":""
+			"discount"
+		}
+	*/
+	router.POST("/data-api/v3/cryptocurrency/transaction/discount", TokenAuthMiddleware, discount)
+	// 我买的(订单)
+	// TODO mybuy_transaction √
+	router.GET("/data-api/v3/cryptocurrency/transaction/mybuy", TokenAuthMiddleware, mybuy_transaction)
+	// 购买货币(函数内部关闭)(事务)(更新双方账户)
+	/*
+		{
+			"TsId": ""
+		}
+	*/
+	// TODO buy √
+	router.POST("/data-api/v3/cryptocurrency/transaction/buy", TokenAuthMiddleware, buy)
+
+	// TODO 消息新表(Uid,MsgType,TsId)√ 降价触发器√ 过期检测√ 打折函数√ 总价格显示(search mybuy mysell)√ 收藏修改√
+
+	// ! TODO 报告 PPT 辅助说明 数据库备份     项目工程源码压缩包 系统功能演示录屏
 
 	if err := router.Run(":8080"); err != nil {
 		log.Fatal("failed run app: ", err)
